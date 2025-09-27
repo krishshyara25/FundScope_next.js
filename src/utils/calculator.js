@@ -95,6 +95,168 @@ export function calculateReturns({ navHistory, period, from, to }) {
 }
 
 /**
+ * Calculate SIP returns for a mutual fund scheme.
+ * @param {Object} params - Parameters for SIP calculation.
+ * @param {Array} params.navHistory - Array of NAV data with date and nav values.
+ * @param {number} params.amount - Investment amount per installment.
+ * @param {string} params.frequency - Investment frequency (e.g., 'monthly').
+ * @param {string} params.from - Start date of the SIP.
+ * @param {string} params.to - End date of the SIP.
+ * @returns {Object} SIP calculation results.
+ */
+export function calculateSIPReturns({ navHistory, amount, frequency = 'monthly', from, to }) {
+  if (!navHistory || navHistory.length === 0) {
+    throw new Error('No NAV data available for calculation');
+  }
+
+  const sortedNavHistory = [...navHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const latestNavData = [...navHistory].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+  const latestNav = parseFloat(latestNavData.nav);
+
+  const startDate = new Date(from);
+  const endDate = new Date(to);
+
+  let totalInvested = 0;
+  let totalUnits = 0;
+  const cashflows = [];
+  const investmentEvents = [];
+
+  let currentDate = new Date(startDate);
+
+  // Helper to advance date based on frequency
+  const advanceDate = (date) => {
+    const d = new Date(date);
+    switch (frequency) {
+      case 'weekly':
+        d.setDate(d.getDate() + 7);
+        break;
+      case 'daily':
+        d.setDate(d.getDate() + 1);
+        break;
+      case 'quarterly':
+        d.setMonth(d.getMonth() + 3);
+        break;
+      case 'monthly':
+      default:
+        d.setMonth(d.getMonth() + 1);
+        break;
+    }
+    return d;
+  };
+
+  while (currentDate <= endDate) {
+    const navOnDate = findClosestNav(sortedNavHistory, currentDate);
+    if (navOnDate) {
+      const installment = parseFloat(amount);
+      const nav = parseFloat(navOnDate.nav);
+      if (nav > 0 && !isNaN(nav)) {
+        const unitsPurchased = installment / nav;
+        totalInvested += installment;
+        totalUnits += unitsPurchased;
+        cashflows.push({ amount: -installment, date: new Date(navOnDate.date) });
+        investmentEvents.push({
+          date: navOnDate.date,
+          nav,
+          installment,
+          cumulativeInvested: totalInvested,
+          cumulativeUnits: totalUnits
+        });
+      }
+    }
+    currentDate = advanceDate(currentDate);
+  }
+
+  if (totalInvested === 0) {
+    return {
+      totalInvested: 0,
+      currentValue: 0,
+      totalUnits: 0,
+      absoluteProfit: 0,
+      absoluteReturnPercent: 0,
+      annualizedReturnPercent: 0,
+      growthChartData: [],
+      duration: { days: 0, years: 0 },
+      message: 'No investments were made in the selected period.'
+    };
+  }
+
+  const currentValue = totalUnits * latestNav;
+  cashflows.push({ amount: currentValue, date: new Date(latestNavData.date) });
+
+  const absoluteProfit = currentValue - totalInvested;
+  const absoluteReturnPercent = (absoluteProfit / totalInvested) * 100;
+  const annualizedReturnPercent = calculateXIRR(cashflows); // already returns %
+
+  // Duration
+  const firstFlowDate = cashflows[0].date;
+  const lastFlowDate = cashflows[cashflows.length - 1].date;
+  const days = Math.round((lastFlowDate - firstFlowDate) / (1000 * 60 * 60 * 24));
+  const years = days / 365.25;
+
+  // Build growth chart data (value trajectory using actual NAV at each investment date & latest NAV for final point)
+  const growthChartData = investmentEvents.map(ev => {
+    return {
+      date: ev.date,
+      invested: ev.cumulativeInvested,
+      value: ev.cumulativeUnits * ev.nav,
+      nav: ev.nav
+    };
+  });
+  // Append final mark-to-market point if last NAV date differs
+  const lastEventDate = investmentEvents[investmentEvents.length - 1]?.date;
+  if (lastEventDate && lastEventDate !== latestNavData.date) {
+    growthChartData.push({
+      date: latestNavData.date,
+      invested: totalInvested,
+      value: currentValue,
+      nav: latestNav
+    });
+  }
+
+  return {
+    totalInvested: Math.round(totalInvested * 100) / 100,
+    currentValue: Math.round(currentValue * 100) / 100,
+    totalUnits: Math.round(totalUnits * 10000) / 10000,
+    absoluteProfit: Math.round(absoluteProfit * 100) / 100,
+    absoluteReturnPercent: Math.round(absoluteReturnPercent * 100) / 100,
+    annualizedReturnPercent: annualizedReturnPercent ? Math.round(annualizedReturnPercent * 100) / 100 : null,
+    growthChartData,
+    duration: { days, years: Math.round(years * 100) / 100 }
+  };
+}
+
+/**
+ * Calculates the irregular rate of return (XIRR) for a series of cash flows.
+ * @param {Array<Object>} cashflows - An array of objects with 'amount' and 'date' properties.
+ * @returns {number} The XIRR as a percentage.
+ */
+function calculateXIRR(cashflows, guess = 0.1) {
+  const maxIterations = 100;
+  const tolerance = 1e-7;
+
+  for (let i = 0; i < maxIterations; i++) {
+    let result = 0;
+    let derivative = 0;
+    const firstDate = cashflows[0].date;
+
+    for (const { amount, date } of cashflows) {
+      const days = (date - firstDate) / (1000 * 60 * 60 * 24);
+      result += amount * Math.pow(1 + guess, -days / 365);
+      derivative += (-days / 365) * amount * Math.pow(1 + guess, (-days / 365) - 1);
+    }
+
+    const newGuess = guess - result / derivative;
+
+    if (Math.abs(newGuess - guess) < tolerance) {
+      return newGuess * 100;
+    }
+    guess = newGuess;
+  }
+
+  return NaN; // Failed to converge
+}
+
+/**
  * Find the NAV entry closest to the specified date
  * @param {Array} navHistory - Sorted NAV history (newest first)
  * @param {Date} targetDate - Target date to find closest NAV for
@@ -104,101 +266,22 @@ function findClosestNav(navHistory, targetDate) {
   if (!navHistory || navHistory.length === 0) return null;
   
   let closest = null;
-  let minDifference = Infinity;
   
+  // Find the latest NAV on or before the target date (nearest earlier NAV)
   for (const nav of navHistory) {
     const navDate = new Date(nav.date);
-    const difference = Math.abs(navDate - targetDate);
+    const navValue = parseFloat(nav.nav);
     
-    if (difference < minDifference) {
-      minDifference = difference;
-      closest = nav;
-    }
+    // Skip invalid NAV values
+    if (navValue <= 0 || isNaN(navValue)) continue;
     
-    // If we find an exact match or we've moved past the target date, break
-    if (difference === 0 || navDate < targetDate) {
+    if (navDate <= targetDate) {
+      closest = nav; // Keep updating to get the latest available
+    } else {
+      // We've passed the target date, stop searching
       break;
     }
   }
   
   return closest;
 }
-
-/**
- * Calculate SIP (Systematic Investment Plan) returns
- * @param {Object} params - Parameters for SIP calculation
- * @param {Array} params.navHistory - Array of NAV data
- * @param {number} params.monthlyAmount|params.amount - Monthly investment amount
- * @param {string} params.startDate|params.from - SIP start date
- * @param {string} params.endDate|params.to - SIP end date
- * @returns {Object} SIP calculation results
- */
-export function calculateSipReturns({ navHistory, monthlyAmount, amount, startDate, from, endDate, to }) {
-  if (!navHistory || navHistory.length === 0) {
-    throw new Error('No NAV data available for SIP calculation');
-  }
-
-  // Handle parameter aliases
-  const investmentAmount = monthlyAmount || amount;
-  const start = new Date(startDate || from);
-  const end = new Date(endDate || to);
-
-  if (!investmentAmount) {
-    throw new Error('Monthly investment amount is required');
-  }
-
-  const sortedNavHistory = navHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
-  
-  let totalInvested = 0;
-  let totalUnits = 0;
-  const investments = [];
-  
-  // Calculate monthly investments
-  let currentDate = new Date(start);
-  while (currentDate <= end) {
-    const closestNav = findClosestNav(sortedNavHistory, currentDate);
-    if (closestNav) {
-      const units = investmentAmount / parseFloat(closestNav.nav);
-      totalUnits += units;
-      totalInvested += investmentAmount;
-      
-      investments.push({
-        date: new Date(currentDate).toISOString().split('T')[0],
-        amount: investmentAmount,
-        nav: parseFloat(closestNav.nav),
-        units: Math.round(units * 10000) / 10000
-      });
-    }
-    
-    // Move to next month
-    currentDate.setMonth(currentDate.getMonth() + 1);
-  }
-  
-  // Calculate current value
-  const latestNav = findClosestNav(sortedNavHistory, end);
-  const currentValue = totalUnits * parseFloat(latestNav.nav);
-  const absoluteReturn = currentValue - totalInvested;
-  const percentageReturn = (absoluteReturn / totalInvested) * 100;
-  
-  // Calculate annualized return
-  const daysDifference = Math.abs((end - start) / (1000 * 60 * 60 * 24));
-  const yearsFraction = daysDifference / 365.25;
-  const annualizedReturn = yearsFraction > 0 ? (Math.pow((currentValue / totalInvested), (1 / yearsFraction)) - 1) * 100 : 0;
-  
-  return {
-    totalInvested: Math.round(totalInvested * 100) / 100,
-    currentValue: Math.round(currentValue * 100) / 100,
-    totalUnits: Math.round(totalUnits * 10000) / 10000,
-    absoluteReturn: Math.round(absoluteReturn * 100) / 100,
-    percentageReturn: Math.round(percentageReturn * 100) / 100,
-    annualizedReturn: yearsFraction >= 1 ? Math.round(annualizedReturn * 100) / 100 : null,
-    duration: {
-      days: Math.round(daysDifference),
-      years: Math.round(yearsFraction * 100) / 100
-    },
-    investments: investments
-  };
-}
-
-// Export alias for backward compatibility
-export { calculateSipReturns as calculateSIPReturns };

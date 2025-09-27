@@ -29,23 +29,23 @@ import {
   Assessment,
   ShowChart
 } from '@mui/icons-material';
+import SipGrowthChart from './SipGrowthChart';
 
 export default function SipCalculator({ schemeCode }) {
-  const [amount, setAmount] = useState(5000);
+  const [amount, setAmount] = useState(20000);
   const [from, setFrom] = useState('2020-01-01');
   const [to, setTo] = useState('2023-12-31');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Quick preset amounts
   const presetAmounts = [1000, 2500, 5000, 10000, 25000, 50000];
 
   const handleCalculate = async () => {
     setLoading(true);
     setError(null);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001');
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
       const response = await fetch(`${baseUrl}/api/scheme/${schemeCode}/sip`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -73,6 +73,7 @@ export default function SipCalculator({ schemeCode }) {
   };
 
   const formatPercentage = (value) => {
+    if (value === null) return 'N/A';
     return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
   };
 
@@ -109,7 +110,7 @@ export default function SipCalculator({ schemeCode }) {
         <Paper sx={{ p: 3, mb: 3, bgcolor: 'rgba(255, 255, 255, 0.7)' }}>
           <Grid container spacing={3}>
             {/* Amount Section */}
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 500 }}>
                 Monthly Investment Amount
               </Typography>
@@ -150,7 +151,7 @@ export default function SipCalculator({ schemeCode }) {
             </Grid>
 
             {/* Date Range */}
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 label="Start Date"
                 type="date"
@@ -163,7 +164,7 @@ export default function SipCalculator({ schemeCode }) {
                 }}
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 label="End Date"
                 type="date"
@@ -178,7 +179,7 @@ export default function SipCalculator({ schemeCode }) {
             </Grid>
 
             {/* Calculate Button */}
-            <Grid size={{ xs: 12 }}>
+            <Grid item xs={12}>
               <Button
                 variant="contained"
                 size="large"
@@ -216,7 +217,7 @@ export default function SipCalculator({ schemeCode }) {
             
             {/* Key Metrics Cards */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
-              <Grid size={{ xs: 6, md: 3 }}>
+              <Grid item xs={6} md={3}>
                 <Paper 
                   sx={{ 
                     p: 2, 
@@ -234,7 +235,7 @@ export default function SipCalculator({ schemeCode }) {
                 </Paper>
               </Grid>
               
-              <Grid size={{ xs: 6, md: 3 }}>
+              <Grid item xs={6} md={3}>
                 <Paper 
                   sx={{ 
                     p: 2, 
@@ -252,47 +253,47 @@ export default function SipCalculator({ schemeCode }) {
                 </Paper>
               </Grid>
 
-              <Grid size={{ xs: 6, md: 3 }}>
+              <Grid item xs={6} md={3}>
                 <Paper 
                   sx={{ 
                     p: 2, 
                     textAlign: 'center',
-                    background: result.absoluteReturn >= 0 
+                    background: result.absoluteProfit >= 0 
                       ? 'linear-gradient(135deg, rgba(5, 150, 105, 0.1) 0%, rgba(255, 255, 255, 1) 100%)'
                       : 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(255, 255, 255, 1) 100%)',
                   }}
                 >
                   <Assessment sx={{ 
-                    color: result.absoluteReturn >= 0 ? 'secondary.main' : 'error.main', 
+                    color: result.absoluteProfit >= 0 ? 'secondary.main' : 'error.main', 
                     mb: 1 
                   }} />
                   <Typography variant="body2" color="text.secondary">
-                    Absolute Return
+                    Profit / Loss
                   </Typography>
                   <Typography 
                     variant="h6" 
                     sx={{ 
                       fontWeight: 600,
-                      color: result.absoluteReturn >= 0 ? 'secondary.main' : 'error.main'
+                      color: result.absoluteProfit >= 0 ? 'secondary.main' : 'error.main'
                     }}
                   >
-                    {formatCurrency(result.absoluteReturn)}
+                    {formatCurrency(result.absoluteProfit)}
                   </Typography>
                 </Paper>
               </Grid>
 
-              <Grid size={{ xs: 6, md: 3 }}>
+              <Grid item xs={6} md={3}>
                 <Paper 
                   sx={{ 
                     p: 2, 
                     textAlign: 'center',
-                    background: result.annualizedReturn >= 0 
+                    background: result.annualizedReturnPercent >= 0 
                       ? 'linear-gradient(135deg, rgba(5, 150, 105, 0.1) 0%, rgba(255, 255, 255, 1) 100%)'
                       : 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(255, 255, 255, 1) 100%)',
                   }}
                 >
                   <ShowChart sx={{ 
-                    color: result.annualizedReturn >= 0 ? 'secondary.main' : 'error.main', 
+                    color: result.annualizedReturnPercent >= 0 ? 'secondary.main' : 'error.main', 
                     mb: 1 
                   }} />
                   <Typography variant="body2" color="text.secondary">
@@ -302,14 +303,26 @@ export default function SipCalculator({ schemeCode }) {
                     variant="h6" 
                     sx={{ 
                       fontWeight: 600,
-                      color: result.annualizedReturn >= 0 ? 'secondary.main' : 'error.main'
+                      color: result.annualizedReturnPercent >= 0 ? 'secondary.main' : 'error.main'
                     }}
                   >
-                    {result.annualizedReturn ? formatPercentage(result.annualizedReturn) : 'N/A'}
+                    {result.annualizedReturnPercent ? formatPercentage(result.annualizedReturnPercent) : 'N/A'}
                   </Typography>
                 </Paper>
               </Grid>
             </Grid>
+
+            {/* Growth Chart (NEWLY ADDED) */}
+            {result.growthChartData && result.growthChartData.length > 0 && (
+                <Box sx={{ mt: 3, mb: 3 }}>
+                    <SipGrowthChart 
+                      sipData={result.growthChartData}
+                      totalInvested={result.totalInvested}
+                      futureValue={result.currentValue}
+                      sipAmount={amount}
+                    />
+                </Box>
+            )}
 
             {/* Summary */}
             <Paper sx={{ p: 3, bgcolor: 'rgba(248, 250, 252, 0.8)' }}>
@@ -317,7 +330,7 @@ export default function SipCalculator({ schemeCode }) {
                 Investment Summary
               </Typography>
               <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 4 }}>
+                <Grid item xs={12} sm={4}>
                   <Typography variant="body2" color="text.secondary">
                     Investment Period
                   </Typography>
@@ -325,7 +338,7 @@ export default function SipCalculator({ schemeCode }) {
                     {result.duration?.years} years ({result.duration?.days} days)
                   </Typography>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
+                <Grid item xs={12} sm={4}>
                   <Typography variant="body2" color="text.secondary">
                     Total Units
                   </Typography>
@@ -333,18 +346,18 @@ export default function SipCalculator({ schemeCode }) {
                     {result.totalUnits?.toFixed(4)} units
                   </Typography>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
+                <Grid item xs={12} sm={4}>
                   <Typography variant="body2" color="text.secondary">
-                    Return %
+                    Absolute Return %
                   </Typography>
                   <Typography 
                     variant="body1" 
                     sx={{ 
                       fontWeight: 500,
-                      color: result.percentageReturn >= 0 ? 'secondary.main' : 'error.main'
+                      color: result.absoluteReturnPercent >= 0 ? 'secondary.main' : 'error.main'
                     }}
                   >
-                    {formatPercentage(result.percentageReturn)}
+                    {formatPercentage(result.absoluteReturnPercent)}
                   </Typography>
                 </Grid>
               </Grid>

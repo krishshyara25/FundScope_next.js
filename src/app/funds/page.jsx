@@ -37,6 +37,7 @@ import {
 import Link from 'next/link';
 import { LoadingSpinner, PageLoadingSpinner, LoadingBar } from '@/components/LoadingComponents';
 import { PerformanceIndicator, OptimizationBanner, LoadingOptimization } from '@/components/PerformanceComponents';
+import FundNavChartDialog from '@/components/FundNavChartDialog';
 
 // Client-side function to fetch schemes with pagination
 async function fetchSchemes(page = 1, limit = 50, search = '', category = 'all', fundHouse = 'all') {
@@ -92,6 +93,10 @@ export default function FundsPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 50; // Items per page
+
+  // Dialog state for NAV chart
+  const [chartOpen, setChartOpen] = useState(false);
+  const [selectedScheme, setSelectedScheme] = useState(null);
 
   // Debounce search term
   useEffect(() => {
@@ -244,6 +249,12 @@ export default function FundsPage() {
       return acc;
     }, {});
   }, [sortedSchemes]);
+
+  const handleOpenChart = (scheme) => {
+    setSelectedScheme(scheme);
+    setChartOpen(true);
+  };
+  const handleCloseChart = () => setChartOpen(false);
 
   if (loading && schemes.length === 0) {
     return (
@@ -483,8 +494,7 @@ export default function FundsPage() {
                         boxShadow: '0 12px 40px rgba(102, 126, 234, 0.15)',
                       },
                     }}
-                    component={Link}
-                    href={`/scheme/${fund.scheme_code}`}
+                    onClick={(e) => { e.preventDefault(); handleOpenChart(fund); }}
                   >
                     <CardContent sx={{ p: 3 }}>
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
@@ -541,6 +551,13 @@ export default function FundsPage() {
           </Grid>
         </Fade>
       )}
+
+      <FundNavChartDialog 
+        open={chartOpen} 
+        onClose={handleCloseChart} 
+        schemeCode={selectedScheme?.scheme_code} 
+        schemeName={selectedScheme?.scheme_name}
+      />
 
       {/* Pagination */}
       {!loading && totalPages > 1 && (

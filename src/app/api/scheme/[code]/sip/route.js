@@ -7,7 +7,7 @@ const CACHE_TTL_SECONDS = 12 * 60 * 60; // 12 hours
 
 export async function POST(request, { params }) {
   const { code } = params;
-  const { amount, from, to } = await request.json();
+  const { amount, frequency, from, to } = await request.json();
 
   const url = `${MF_API_URL}/${code}`;
   
@@ -24,7 +24,7 @@ export async function POST(request, { params }) {
     }
     
     // Call the SIP calculation utility function
-    const results = calculateSIPReturns({ navHistory, amount, from, to });
+    const results = calculateSIPReturns({ navHistory, amount, frequency, from, to });
 
     return NextResponse.json(results);
   } catch (error) {

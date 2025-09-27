@@ -29,10 +29,10 @@ import {
 import SchemeDetails from '@/components/SchemeDetails';
 import NavChart from '@/components/NavChart';
 import SipCalculator from '@/components/SipCalculator';
+import PrecomputedReturnsTable from '@/components/PrecomputedReturnsTable';
 
-// Client-side function to fetch scheme details
 async function fetchSchemeDetails(code) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001');
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
   const res = await fetch(`${baseUrl}/api/scheme/${code}`, {
     cache: 'no-store',
   });
@@ -69,14 +69,9 @@ export default function SchemePage({ params }) {
   if (loading) {
     return (
       <Box>
-        {/* Breadcrumb Skeleton */}
         <Skeleton variant="text" width={300} height={32} sx={{ mb: 2 }} />
-        
-        {/* Header Skeleton */}
         <Skeleton variant="text" width="80%" height={48} sx={{ mb: 1 }} />
         <Skeleton variant="text" width="60%" height={24} sx={{ mb: 3 }} />
-        
-        {/* Content Skeleton */}
         <Grid container spacing={4}>
           <Grid item xs={12} md={6}>
             <Skeleton variant="rectangular" height={400} sx={{ borderRadius: 2 }} />
@@ -115,12 +110,10 @@ export default function SchemePage({ params }) {
     value: parseFloat(item.nav)
   })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) || [];
 
-  // Get latest NAV for display
   const latestNav = navHistory.length > 0 ? navHistory[navHistory.length - 1] : null;
 
   return (
     <Box>
-      {/* Breadcrumb Navigation */}
       <Breadcrumbs 
         separator={<NavigateNext fontSize="small" />} 
         sx={{ mb: 3 }}
@@ -143,7 +136,6 @@ export default function SchemePage({ params }) {
         </Typography>
       </Breadcrumbs>
 
-      {/* Header Section */}
       <Fade in={true} timeout={600}>
         <Paper 
           sx={{ 
@@ -155,7 +147,7 @@ export default function SchemePage({ params }) {
           }}
         >
           <Grid container spacing={3} alignItems="center">
-            <Grid size={{ xs: 12, md: 8 }}>
+            <Grid item xs={12} md={8}>
               <Typography 
                 variant="h3" 
                 component="h1" 
@@ -196,7 +188,7 @@ export default function SchemePage({ params }) {
               </Typography>
             </Grid>
             
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid item xs={12} md={4}>
               {latestNav && (
                 <Box sx={{ textAlign: { xs: 'left', md: 'right' } }}>
                   <Typography variant="body2" color="text.secondary">
@@ -232,21 +224,24 @@ export default function SchemePage({ params }) {
         </Paper>
       </Fade>
 
-      {/* Main Content */}
       <Fade in={true} timeout={800}>
         <Grid container spacing={4}>
-          {/* Fund Details */}
-          <Grid size={{ xs: 12, lg: 6 }}>
+          <Grid item xs={12} lg={6}>
             <SchemeDetails meta={meta} />
           </Grid>
           
-          {/* NAV Chart */}
-          <Grid size={{ xs: 12, lg: 6 }}>
-            <NavChart navHistory={navHistory} />
+          <Grid item xs={12} lg={6}>
+            <Grid container spacing={4}>
+              <Grid item xs={12}>
+                <NavChart navHistory={navHistory} />
+              </Grid>
+              <Grid item xs={12}>
+                <PrecomputedReturnsTable schemeCode={code} />
+              </Grid>
+            </Grid>
           </Grid>
           
-          {/* SIP Calculator */}
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs={12}>
             <SipCalculator schemeCode={code} />
           </Grid>
         </Grid>
