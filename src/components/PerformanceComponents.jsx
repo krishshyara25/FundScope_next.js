@@ -51,7 +51,7 @@ export function PerformanceIndicator({
           </Typography>
         </Box>
         <Chip 
-          label="50/page" 
+          label="15/page" 
           color="primary" 
           size="small" 
           icon={<TrendingUp />}
@@ -79,7 +79,7 @@ export function OptimizationBanner() {
             🚀 Performance Enhanced
           </Typography>
           <Typography variant="body2">
-            This page loads 50 funds at a time to ensure smooth performance with our 40,000+ fund database.
+            This page loads 15 funds at a time to ensure smooth performance with our 40,000+ fund database.
           </Typography>
         </Box>
         <Button 

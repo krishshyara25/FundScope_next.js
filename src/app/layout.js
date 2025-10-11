@@ -1,3 +1,4 @@
+// src/app/layout.js
 'use client';
 
 import * as React from 'react';
@@ -13,7 +14,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Link from 'next/link';
-import { TrendingUp, Assessment, Calculate, Home } from '@mui/icons-material';
+import { TrendingUp, Assessment, Calculate, Home, Bookmark } from '@mui/icons-material'; // Import Bookmark
 
 export default function RootLayout(props) {
   return (
@@ -67,6 +68,20 @@ export default function RootLayout(props) {
                       }}
                     >
                       All Funds
+                    </Button>
+                    <Button
+                      component={Link}
+                      href="/watchlist" // NEW WATCHLIST LINK
+                      color="inherit"
+                      startIcon={<Bookmark />}
+                      sx={{ 
+                        mx: 1,
+                        '&:hover': {
+                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        },
+                      }}
+                    >
+                      Watchlist
                     </Button>
                     <Button
                       component={Link}

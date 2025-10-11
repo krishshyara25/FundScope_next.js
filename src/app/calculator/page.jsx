@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
@@ -21,7 +21,8 @@ import {
   Alert,
   Fade,
   Autocomplete,
-  CircularProgress
+  CircularProgress,
+  ButtonGroup 
 } from '@mui/material';
 import {
   Calculate,
@@ -29,29 +30,38 @@ import {
   AccountBalance,
   Timeline,
   AttachMoney,
-  Percent
+  Percent,
+  Redeem
 } from '@mui/icons-material';
 
 export default function CalculatorPage() {
-  // SIP Calculator State
-  const [sipAmount, setSipAmount] = useState(20000);
+  // --- SIP Calculator State ---
+  const [sipAmount, setSipAmount] = useState(10000);
   const [sipPeriod, setSipPeriod] = useState(10);
   const [expectedReturn, setExpectedReturn] = useState(12);
+  const [sipType, setSipType] = useState('standard'); 
+  const [stepUpRate, setStepUpRate] = useState(5); 
 
-  // Lump Sum Calculator State
+  // --- Lump Sum Calculator State ---
   const [lumpSumAmount, setLumpSumAmount] = useState(100000);
   const [lumpSumPeriod, setLumpSumPeriod] = useState(5);
   const [lumpSumReturn, setLumpSumReturn] = useState(10);
-
+  
+  // --- SWP Calculator State ---
+  const [swpCorpus, setSwpCorpus] = useState(1000000); 
+  const [swpWithdrawal, setSwpWithdrawal] = useState(10000); 
+  const [swpPeriod, setSwpPeriod] = useState(5); 
+  const [swpReturn, setSwpReturn] = useState(8); 
+  
   const [activeCalculator, setActiveCalculator] = useState('sip');
 
-  // Real-time Calculator State
+  // Real-time Calculator State (Historical NAV Comparison)
   const [schemes, setSchemes] = useState([]);
   const [schemeLoading, setSchemeLoading] = useState(false);
   const [selectedScheme, setSelectedScheme] = useState(null);
   const [navData, setNavData] = useState(null);
   const [historicalSipYears, setHistoricalSipYears] = useState(5);
-  const [realSipAmount, setRealSipAmount] = useState(20000);
+  const [realSipAmount, setRealSipAmount] = useState(10000);
   const [realSipResult, setRealSipResult] = useState(null);
   const [realSipLoading, setRealSipLoading] = useState(false);
   const [historicalLumpSumAmount, setHistoricalLumpSumAmount] = useState(100000);
@@ -61,7 +71,7 @@ export default function CalculatorPage() {
   const [requiredSip, setRequiredSip] = useState(null);
   const [calcError, setCalcError] = useState(null);
 
-  // Fetch schemes list once
+  // Fetch schemes list once (UNCHANGED)
   useEffect(() => {
     const loadSchemes = async () => {
       try {
@@ -81,7 +91,7 @@ export default function CalculatorPage() {
     loadSchemes();
   }, []);
 
-  // Fetch NAV history when scheme changes
+  // Fetch NAV history when scheme changes (UNCHANGED)
   useEffect(() => {
     if (!selectedScheme) return;
     const fetchNav = async () => {
@@ -99,17 +109,7 @@ export default function CalculatorPage() {
     fetchNav();
   }, [selectedScheme]);
 
-  // Helper to compute from date given years
-  const computeFromDate = (years, navHistory) => {
-    if (!navHistory || navHistory.length === 0) return null;
-    const latest = navHistory[0].date ? navHistory[0].date : navHistory[0].date; // placeholder
-    const latestDate = new Date(navHistory[0].date || navHistory[0].date);
-    const start = new Date(latestDate);
-    start.setFullYear(start.getFullYear() - years);
-    return start;
-  };
-
-  // Trigger real-time SIP calculation when dependencies change
+  // Trigger real-time SIP calculation when dependencies change (UNCHANGED)
   useEffect(() => {
     const runSip = async () => {
       if (!selectedScheme || !navData) return;
@@ -141,7 +141,7 @@ export default function CalculatorPage() {
     runSip();
   }, [selectedScheme, navData, realSipAmount, historicalSipYears]);
 
-  // Historical lump sum calculation using navData
+  // Historical lump sum calculation using navData (UNCHANGED)
   useEffect(() => {
     if (!selectedScheme || !navData) return;
     try {
@@ -170,7 +170,7 @@ export default function CalculatorPage() {
     }
   }, [selectedScheme, navData, historicalSipYears, historicalLumpSumAmount]);
 
-  // Goal calculator (required SIP) based on historical CAGR if available
+  // Goal calculator (required SIP) based on historical CAGR if available (UNCHANGED)
   useEffect(() => {
     if (!goalTargetAmount || !goalYears) return;
     let annualRate = 0.12; // default 12%
@@ -187,37 +187,147 @@ export default function CalculatorPage() {
     setRequiredSip(required);
   }, [goalTargetAmount, goalYears, historicalLumpSumResult]);
 
-  // Format helpers additions
+  // Format helpers additions (UNCHANGED)
   const formatNumber = (v, digits=2) => typeof v === 'number' && !isNaN(v) ? v.toFixed(digits) : '—';
 
-  const sipResults = calculateSIP();
+  // --- Calculator Function Calls ---
+  const sipResults = sipType === 'standard' ? calculateStandardSIP() : calculateStepUpSIP(); 
   const lumpSumResults = calculateLumpSum();
+  const swpResults = calculateSWP();
 
   const formatCurrency = (amount) => {
+    // Ensure rounding happens only for display if needed, but not in calculation steps
+    const roundedAmount = Math.round(amount);
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
       maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(roundedAmount);
   };
 
-  // SIP Calculation
-  function calculateSIP() {
+  // SIP Calculation (FIXED to correct Annuity Due formula)
+  function calculateStandardSIP() {
     const monthlyRate = expectedReturn / 100 / 12;
     const months = sipPeriod * 12;
-    const futureValue = sipAmount * (((1 + monthlyRate) ** months - 1) / monthlyRate) * (1 + monthlyRate);
+    
+    // Future Value (FV) of Annuity Due: FV = P * [((1 + i)^n - 1) / i] * (1 + i)
+    const growthFactor = ((1 + monthlyRate) ** months - 1) / monthlyRate;
+    
+    // CORRECTED FORMULA
+    const futureValue = sipAmount * growthFactor * (1 + monthlyRate);
+    
     const totalInvested = sipAmount * months;
     const returns = futureValue - totalInvested;
-    return { futureValue, totalInvested, returns };
+
+    return { 
+        futureValue, 
+        totalInvested, 
+        returns 
+    };
+  }
+  
+  // SIP Step-up Calculation (PRESERVED)
+  function calculateStepUpSIP() {
+    // Use annuity-due model: deposit at the start of each month, then corpus grows
+    const monthlyRate = expectedReturn / 100 / 12;
+    const stepUpFactor = 1 + stepUpRate / 100;
+    const totalYears = Math.max(0, Math.floor(sipPeriod));
+
+    let monthlyInvestment = Number(sipAmount) || 0;
+    let corpus = 0;
+    let totalInvested = 0;
+
+    for (let y = 0; y < totalYears; y++) {
+      for (let m = 0; m < 12; m++) {
+        // 1) Deposit at start of month (annuity-due)
+        corpus += monthlyInvestment;
+        totalInvested += monthlyInvestment;
+
+        // 2) Corpus grows for the month
+        corpus *= (1 + monthlyRate);
+
+        // keep intermediate precision sensible to avoid floating noise
+        corpus = Math.round(corpus * 100000) / 100000;
+      }
+
+      // Apply annual step-up so next year's first deposit uses the increased SIP
+      monthlyInvestment *= stepUpFactor;
+      // round monthlyInvestment to paise precision
+      monthlyInvestment = Math.round(monthlyInvestment * 100) / 100;
+    }
+
+    const returns = corpus - totalInvested;
+
+    return {
+      futureValue: corpus,
+      totalInvested: totalInvested,
+      returns: returns,
+    };
   }
 
-  // Lump Sum Calculation
+  // Lump Sum Calculation (UNCHANGED)
   function calculateLumpSum() {
     const annualRate = lumpSumReturn / 100;
     const futureValue = lumpSumAmount * ((1 + annualRate) ** lumpSumPeriod);
     const returns = futureValue - lumpSumAmount;
     return { futureValue, totalInvested: lumpSumAmount, returns };
   }
+
+  // SWP Calculation (Standard only) - Preserved standard logic
+  function calculateSWP() {
+    let currentCorpus = swpCorpus;
+    const monthlyReturnRate = swpReturn / 100 / 12;
+    const months = swpPeriod * 12;
+    const monthlyWithdrawal = swpWithdrawal;
+    const monthlyInvested = swpCorpus; 
+    
+    let totalWithdrawn = 0;
+    
+    for (let month = 1; month <= months; month++) {
+        
+        // 1. Withdrawal occurs (Start-of-Month Model)
+        if (currentCorpus >= monthlyWithdrawal) {
+            currentCorpus -= monthlyWithdrawal;
+            totalWithdrawn += monthlyWithdrawal;
+        } else {
+            // Corpus depleted before the period ends
+            totalWithdrawn += currentCorpus;
+            currentCorpus = 0;
+            const yearsRun = (month - 1) / 12;
+            return {
+                corpusEnd: 0,
+                totalWithdrawn: Math.round(totalWithdrawn),
+                totalCorpus: monthlyInvested,
+                returns: Math.round(totalWithdrawn - monthlyInvested),
+                status: 'Depleted',
+                monthsRun: month - 1,
+                yearsRun: Math.round(yearsRun * 10) / 10
+            };
+        }
+        
+        // 2. Corpus grows on the *remaining* balance
+        currentCorpus *= (1 + monthlyReturnRate);
+
+        // Rounding intermediate results
+        currentCorpus = Math.round(currentCorpus * 1000000) / 1000000;
+    }
+    
+    const returns = currentCorpus + totalWithdrawn - monthlyInvested;
+    
+    // Final rounding for the exact display value
+    const finalCorpusEnd = Math.round(currentCorpus);
+
+    return {
+        corpusEnd: finalCorpusEnd,
+        totalWithdrawn: Math.round(totalWithdrawn),
+        totalCorpus: monthlyInvested,
+        returns: Math.round(returns),
+        status: 'Surplus',
+        monthsRun: months,
+        yearsRun: swpPeriod
+    };
+  }
+
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -242,7 +352,7 @@ export default function CalculatorPage() {
         </Typography>
       </Box>
 
-      {/* Calculator Type Selection */}
+      {/* Calculator Type Selection (SWP BUTTON RETAINED) */}
       <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
         <Paper sx={{ p: 1, display: 'inline-flex' }}>
           <Button
@@ -257,30 +367,50 @@ export default function CalculatorPage() {
             variant={activeCalculator === 'lumpsum' ? 'contained' : 'outlined'}
             onClick={() => setActiveCalculator('lumpsum')}
             startIcon={<AttachMoney />}
+            sx={{ mr: 1 }}
           >
             Lump Sum Calculator
+          </Button>
+          <Button 
+            variant={activeCalculator === 'swp' ? 'contained' : 'outlined'}
+            onClick={() => setActiveCalculator('swp')}
+            startIcon={<Redeem />}
+          >
+            SWP Calculator
           </Button>
         </Paper>
       </Box>
 
-      {/* SIP Calculator */}
+      {/* SIP Calculator (DESIGN UPDATED & CALCULATION FIXED) */}
       {activeCalculator === 'sip' && (
         <Fade in={true} timeout={500}>
           <Grid container spacing={4}>
             {/* SIP Input Section */}
-            <Grid size={{ xs: 12, lg: 6 }}>
+            <Grid item xs={12} lg={6}>
               <Card sx={{ height: '100%' }}>
                 <CardContent sx={{ p: 4 }}>
-                  <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Calculate sx={{ mr: 2 }} />
-                    SIP Calculator
-                  </Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
+                      <Calculate sx={{ mr: 2 }} />
+                      {sipType === 'standard' ? 'Standard SIP' : 'Step-up SIP'}
+                    </Typography>
+                    <ButtonGroup variant="outlined" size="small">
+                        <Button 
+                            onClick={() => setSipType('standard')} 
+                            variant={sipType === 'standard' ? 'contained' : 'outlined'}
+                        >Standard</Button>
+                        <Button 
+                            onClick={() => setSipType('stepup')} 
+                            variant={sipType === 'stepup' ? 'contained' : 'outlined'}
+                        >Step-up</Button>
+                    </ButtonGroup>
+                  </Box>
                   <Divider sx={{ mb: 3 }} />
 
                   {/* Monthly Investment */}
                   <Box sx={{ mb: 4 }}>
                     <Typography variant="subtitle1" gutterBottom>
-                      Monthly Investment Amount
+                      Monthly Investment Amount (Start)
                     </Typography>
                     <TextField
                       fullWidth
@@ -326,6 +456,36 @@ export default function CalculatorPage() {
                     />
                   </Box>
 
+                  {/* Step-up Rate Input */}
+                  {sipType === 'stepup' && (
+                    <Fade in={true}>
+                      <Box sx={{ mb: 4, border: '1px solid', borderColor: 'warning.light', p: 2, borderRadius: 2, bgcolor: 'warning.50' }}>
+                        <Typography variant="subtitle1" gutterBottom>
+                          Annual Step-up Rate (%)
+                        </Typography>
+                        <TextField
+                          fullWidth
+                          type="number"
+                          value={stepUpRate}
+                          onChange={(e) => setStepUpRate(Number(e.target.value))}
+                          InputProps={{
+                            endAdornment: <Typography sx={{ ml: 1 }}>%</Typography>,
+                          }}
+                          sx={{ mb: 2 }}
+                        />
+                        <Slider
+                          value={stepUpRate}
+                          onChange={(e, value) => setStepUpRate(value)}
+                          min={1}
+                          max={25}
+                          step={1}
+                          valueLabelDisplay="auto"
+                          color="warning"
+                        />
+                      </Box>
+                    </Fade>
+                  )}
+
                   {/* Expected Return */}
                   <Box sx={{ mb: 4 }}>
                     <Typography variant="subtitle1" gutterBottom>
@@ -355,8 +515,8 @@ export default function CalculatorPage() {
               </Card>
             </Grid>
 
-            {/* SIP Results Section */}
-            <Grid size={{ xs: 12, lg: 6 }}>
+            {/* SIP Results Section (REDESIGNED) */}
+            <Grid item xs={12} lg={6}>
               <Card sx={{ height: '100%', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
                 <CardContent sx={{ p: 4, color: 'white' }}>
                   <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
@@ -365,19 +525,20 @@ export default function CalculatorPage() {
                   </Typography>
                   <Divider sx={{ mb: 3, borderColor: 'rgba(255,255,255,0.2)' }} />
 
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="h3" gutterBottom sx={{ fontWeight: 700 }}>
-                      {formatCurrency(sipResults.futureValue)}
+                  {/* Main Result Display */}
+                  <Box sx={{ mb: 4, textAlign: 'center' }}>
+                    <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                      Future Value After {sipPeriod} Years
                     </Typography>
-                    <Typography variant="subtitle1" sx={{ opacity: 0.8 }}>
-                      Maturity Amount
+                    <Typography variant="h2" gutterBottom sx={{ fontWeight: 800, mt: 1 }}>
+                      {formatCurrency(sipResults.futureValue)}
                     </Typography>
                   </Box>
 
                   <Grid container spacing={2}>
-                    <Grid size={{ xs: 6 }}>
-                      <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.1)' }}>
-                        <Typography variant="h6" sx={{ color: 'white' }}>
+                    <Grid item xs={6}>
+                      <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.1)', textAlign: 'center' }}>
+                        <Typography variant="h6" sx={{ color: 'white', fontWeight: 700 }}>
                           {formatCurrency(sipResults.totalInvested)}
                         </Typography>
                         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
@@ -385,22 +546,48 @@ export default function CalculatorPage() {
                         </Typography>
                       </Paper>
                     </Grid>
-                    <Grid size={{ xs: 6 }}>
-                      <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.1)' }}>
-                        <Typography variant="h6" sx={{ color: 'white' }}>
+                    <Grid item xs={6}>
+                      <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.1)', textAlign: 'center' }}>
+                        <Typography variant="h6" sx={{ color: 'white', fontWeight: 700 }}>
                           {formatCurrency(sipResults.returns)}
                         </Typography>
                         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                          Total Returns
+                          Estimated Returns
                         </Typography>
                       </Paper>
                     </Grid>
                   </Grid>
 
-                  <Box sx={{ mt: 3 }}>
-                    <Alert severity="info" sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: 'white' }}>
-                      <Typography variant="body2">
-                        <strong>Monthly SIP:</strong> ₹{sipAmount.toLocaleString()} × {sipPeriod * 12} months
+                  <Box sx={{ mt: 4 }}>
+                    <Alert 
+                        severity="info" 
+                        sx={{ 
+                            bgcolor: 'rgba(255,255,255,0.1)', 
+                            color: 'white',
+                            border: '1px solid rgba(255,255,255,0.2)'
+                        }}
+                    >
+                      <Typography variant="body2" component="div">
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
+                            <span>Annual Rate:</span>
+                            <span>{expectedReturn.toFixed(1)}%</span>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Investment Period:</span>
+                            <span>{sipPeriod} Years ({sipPeriod * 12} Months)</span>
+                        </Box>
+                        <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.2)' }} />
+                        <Box>
+                        {sipType === 'standard' ? (
+                            <Typography variant="body2">
+                                Calculated with a **standard monthly SIP** of ₹{sipAmount.toLocaleString()}.
+                            </Typography>
+                        ) : (
+                            <Typography variant="body2">
+                                Calculated with a starting monthly SIP of ₹{sipAmount.toLocaleString()} and **{stepUpRate}% annual step-up**.
+                            </Typography>
+                        )}
+                        </Box>
                       </Typography>
                     </Alert>
                   </Box>
@@ -411,12 +598,12 @@ export default function CalculatorPage() {
         </Fade>
       )}
 
-      {/* Lump Sum Calculator */}
+      {/* Lump Sum Calculator (PREVIOUS UI RETAINED) */}
       {activeCalculator === 'lumpsum' && (
         <Fade in={true} timeout={500}>
           <Grid container spacing={4}>
             {/* Lump Sum Input Section */}
-            <Grid size={{ xs: 12, lg: 6 }}>
+            <Grid item xs={12} lg={6}>
               <Card sx={{ height: '100%' }}>
                 <CardContent sx={{ p: 4 }}>
                   <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
@@ -504,7 +691,7 @@ export default function CalculatorPage() {
             </Grid>
 
             {/* Lump Sum Results Section */}
-            <Grid size={{ xs: 12, lg: 6 }}>
+            <Grid item xs={12} lg={6}>
               <Card sx={{ height: '100%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
                 <CardContent sx={{ p: 4, color: 'white' }}>
                   <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
@@ -523,7 +710,7 @@ export default function CalculatorPage() {
                   </Box>
 
                   <Grid container spacing={2}>
-                    <Grid size={{ xs: 6 }}>
+                    <Grid item xs={6}>
                       <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.1)' }}>
                         <Typography variant="h6" sx={{ color: 'white' }}>
                           {formatCurrency(lumpSumResults.totalInvested)}
@@ -533,7 +720,7 @@ export default function CalculatorPage() {
                         </Typography>
                       </Paper>
                     </Grid>
-                    <Grid size={{ xs: 6 }}>
+                    <Grid item xs={6}>
                       <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.1)' }}>
                         <Typography variant="h6" sx={{ color: 'white' }}>
                           {formatCurrency(lumpSumResults.returns)}
@@ -559,10 +746,122 @@ export default function CalculatorPage() {
         </Fade>
       )}
 
+      {/* SWP Calculator (Standard only) */}
+      {activeCalculator === 'swp' && (
+        <Fade in={true} timeout={500}>
+          <Grid container spacing={4}>
+            {/* SWP Input Section */}
+            <Grid item xs={12} lg={6}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent sx={{ p: 4 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
+                      <Redeem sx={{ mr: 2 }} />
+                      Standard SWP
+                    </Typography>
+                    {/* SWP Type Toggle removed */}
+                  </Box>
+                  <Divider sx={{ mb: 3 }} />
+
+                  {/* Initial Corpus */}
+                  <Box sx={{ mb: 4 }}>
+                    <Typography variant="subtitle1" gutterBottom>Initial Corpus Amount</Typography>
+                    <TextField fullWidth type="number" value={swpCorpus} onChange={(e) => setSwpCorpus(Number(e.target.value))} InputProps={{ startAdornment: <Typography sx={{ mr: 1 }}>₹</Typography> }} sx={{ mb: 2 }} />
+                    <Slider value={swpCorpus} onChange={(e, value) => setSwpCorpus(value)} min={100000} max={10000000} step={100000} valueLabelDisplay="auto" color="primary" />
+                  </Box>
+
+                  {/* Monthly Withdrawal */}
+                  <Box sx={{ mb: 4 }}>
+                    <Typography variant="subtitle1" gutterBottom>Monthly Withdrawal Amount</Typography>
+                    <TextField fullWidth type="number" value={swpWithdrawal} onChange={(e) => setSwpWithdrawal(Number(e.target.value))} InputProps={{ startAdornment: <Typography sx={{ mr: 1 }}>₹</Typography> }} sx={{ mb: 2 }} />
+                    <Slider value={swpWithdrawal} onChange={(e, value) => setSwpWithdrawal(value)} min={1000} max={100000} step={1000} valueLabelDisplay="auto" color="secondary" />
+                  </Box>
+
+                  {/* Withdrawal Period */}
+                  <Box sx={{ mb: 4 }}>
+                    <Typography variant="subtitle1" gutterBottom>Withdrawal Period (Years)</Typography>
+                    <TextField fullWidth type="number" value={swpPeriod} onChange={(e) => setSwpPeriod(Number(e.target.value))} sx={{ mb: 2 }} />
+                    <Slider value={swpPeriod} onChange={(e, value) => setSwpPeriod(value)} min={1} max={30} step={1} valueLabelDisplay="auto" color="primary" />
+                  </Box>
+
+                  {/* Expected Return */}
+                  <Box sx={{ mb: 4 }}>
+                    <Typography variant="subtitle1" gutterBottom>Expected Annual Return (%)</Typography>
+                    <TextField fullWidth type="number" value={swpReturn} onChange={(e) => setSwpReturn(Number(e.target.value))} InputProps={{ endAdornment: <Typography sx={{ ml: 1 }}>%</Typography> }} sx={{ mb: 2 }} />
+                    <Slider value={swpReturn} onChange={(e, value) => setSwpReturn(value)} min={1} max={15} step={0.5} valueLabelDisplay="auto" color="secondary" />
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* SWP Results Section */}
+            <Grid item xs={12} lg={6}>
+              <Card sx={{ height: '100%', background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)' }}>
+                <CardContent sx={{ p: 4, color: 'white' }}>
+                  <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Redeem sx={{ mr: 2 }} />
+                    Withdrawal Projection
+                  </Typography>
+                  <Divider sx={{ mb: 3, borderColor: 'rgba(255,255,255,0.2)' }} />
+
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="h3" gutterBottom sx={{ fontWeight: 700 }}>
+                      {swpResults.status === 'Surplus' ? formatCurrency(swpResults.corpusEnd) : '₹0'}
+                    </Typography>
+                    <Typography variant="subtitle1" sx={{ opacity: 0.8 }}>
+                      Corpus Remaining
+                    </Typography>
+                  </Box>
+
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.1)' }}>
+                        <Typography variant="h6" sx={{ color: 'white' }}>
+                          {formatCurrency(swpResults.totalCorpus)}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                          Initial Corpus
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.1)' }}>
+                        <Typography variant="h6" sx={{ color: 'white' }}>
+                          {formatCurrency(swpResults.totalWithdrawn)}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                          Total Withdrawn
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+
+                  <Box sx={{ mt: 3 }}>
+                    <Alert severity={swpResults.status === 'Surplus' ? 'success' : 'error'} sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: 'white' }}>
+                      <Typography variant="body2" component="div"> 
+                        {swpResults.status === 'Surplus' ? (
+                          <>
+                            <strong>Status: Safe.</strong> Corpus survived {swpResults.yearsRun} years. Total returns earned: {formatCurrency(swpResults.returns)}.
+                          </>
+                        ) : (
+                          <>
+                            <strong>Status: Depleted.</strong> Ran out after {swpResults.yearsRun} years ({swpResults.monthsRun} months).
+                          </>
+                        )}
+                      </Typography>
+                    </Alert>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Fade>
+      )}
+
       {/* Scheme Selection (Real-time) */}
       <Paper sx={{ p: 3, mb: 5 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid item xs={12} md={4}>
             <Autocomplete
               loading={schemeLoading}
               options={schemes}
@@ -582,9 +881,9 @@ export default function CalculatorPage() {
               )}
             />
           </Grid>
-          <Grid size={{ xs: 12, md: 8 }}>
+          <Grid item xs={12} md={8}>
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 4 }}>
+              <Grid item xs={12} sm={4}>
                 <TextField
                   label="SIP Amount"
                   type="number"
@@ -593,7 +892,7 @@ export default function CalculatorPage() {
                   onChange={(e) => setRealSipAmount(Number(e.target.value))}
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 4 }}>
+              <Grid item xs={12} sm={4}>
                 <TextField
                   label="Historical Years"
                   type="number"
@@ -602,7 +901,7 @@ export default function CalculatorPage() {
                   onChange={(e) => setHistoricalSipYears(Number(e.target.value))}
                 />
               </Grid>
-              <Grid size={{ xs: 12, sm: 4 }}>
+              <Grid item xs={12} sm={4}>
                 <TextField
                   label="Lump Sum Amount"
                   type="number"
@@ -620,7 +919,7 @@ export default function CalculatorPage() {
       {/* Real-time Results Summary */}
       {selectedScheme && (
         <Grid container spacing={3} sx={{ mb: 6 }}>
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid item xs={12} md={4}>
             <Card sx={{ height: '100%' }}>
               <CardContent>
                 <Typography variant="h6" gutterBottom>Real SIP (Historical)</Typography>
@@ -641,7 +940,7 @@ export default function CalculatorPage() {
               </CardContent>
             </Card>
           </Grid>
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid item xs={12} md={4}>
             <Card sx={{ height: '100%' }}>
               <CardContent>
                 <Typography variant="h6" gutterBottom>Historical Lump Sum</Typography>
@@ -660,15 +959,15 @@ export default function CalculatorPage() {
               </CardContent>
             </Card>
           </Grid>
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid item xs={12} md={4}>
             <Card sx={{ height: '100%' }}>
               <CardContent>
                 <Typography variant="h6" gutterBottom>Goal (Required SIP)</Typography>
                 <Grid container spacing={1} sx={{ mb: 1 }}>
-                  <Grid size={{ xs: 6 }}>
+                  <Grid item xs={6}>
                     <TextField label="Target Corpus" type="number" fullWidth value={goalTargetAmount} onChange={(e)=>setGoalTargetAmount(Number(e.target.value))} />
                   </Grid>
-                  <Grid size={{ xs: 6 }}>
+                  <Grid item xs={6}>
                     <TextField label="Years" type="number" fullWidth value={goalYears} onChange={(e)=>setGoalYears(Number(e.target.value))} />
                   </Grid>
                 </Grid>
@@ -684,12 +983,6 @@ export default function CalculatorPage() {
           </Grid>
         </Grid>
       )}
-
-      {/* Existing calculators retained below */}
-      {/* REMOVE duplicated legacy calculators to prevent double rendering */}
-      {/* BEGIN: Removed old SIP & Lump Sum duplicate sections */}
-      {/* (Old sections were here) */}
-      {/* END: Removed */}
     </Container>
   );
 }

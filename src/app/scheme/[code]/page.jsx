@@ -1,3 +1,4 @@
+// src/app/scheme/[code]/page.jsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -24,6 +25,7 @@ import {
   Assessment,
   Calculate,
   Share,
+  Bookmark,
   BookmarkBorder
 } from '@mui/icons-material';
 import SchemeDetails from '@/components/SchemeDetails';
@@ -43,18 +45,52 @@ async function fetchSchemeDetails(code) {
   return data;
 }
 
+// Check if scheme is in watchlist
+async function checkWatchlist(code) {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+  const res = await fetch(`${baseUrl}/api/watchlist`);
+  if (!res.ok) return false;
+  const data = await res.json();
+  // Check if scheme code exists in the list of watchlist items (which includes scheme_code and scheme_name)
+  return data.watchlist?.some(item => item.scheme_code === code) || false;
+}
+
+// Toggle scheme in watchlist (ADD or DELETE)
+async function toggleWatchlist(code, name, isWatched) {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+    const method = isWatched ? 'DELETE' : 'POST';
+    
+    const res = await fetch(`${baseUrl}/api/watchlist`, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheme_code: code, scheme_name: name })
+    });
+    
+    if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || data.error || `Failed to ${isWatched ? 'remove' : 'add'} fund.`);
+    }
+    return !isWatched; // Return new state (if it was added, return true; if removed, return false)
+}
+
+
 export default function SchemePage({ params }) {
   const { code } = params;
   const [schemeData, setSchemeData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isWatched, setIsWatched] = useState(false);
+  const [watchlistLoading, setWatchlistLoading] = useState(false);
 
+  // Initial data load and watchlist status check
   useEffect(() => {
     const loadSchemeData = async () => {
       try {
         setLoading(true);
         const data = await fetchSchemeDetails(code);
+        const watched = await checkWatchlist(code);
         setSchemeData(data);
+        setIsWatched(watched);
         setError(null);
       } catch (err) {
         setError(err.message);
@@ -65,6 +101,25 @@ export default function SchemePage({ params }) {
 
     loadSchemeData();
   }, [code]);
+
+  const handleToggleWatchlist = async () => {
+    if (!schemeData || watchlistLoading) return;
+    setWatchlistLoading(true);
+    setError(null);
+    try {
+        const newWatchedState = await toggleWatchlist(
+            code, 
+            schemeData.meta.scheme_name, 
+            isWatched
+        );
+        setIsWatched(newWatchedState);
+    } catch (err) {
+        setError(err.message);
+    } finally {
+        setWatchlistLoading(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -205,11 +260,14 @@ export default function SchemePage({ params }) {
               
               <Box sx={{ mt: 3, display: 'flex', gap: 1, justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
                 <Button
-                  variant="outlined"
-                  startIcon={<BookmarkBorder />}
-                  size="small"
+                    variant={isWatched ? 'contained' : 'outlined'}
+                    color={isWatched ? 'secondary' : 'primary'}
+                    startIcon={isWatched ? <Bookmark /> : <BookmarkBorder />}
+                    size="small"
+                    onClick={handleToggleWatchlist}
+                    disabled={watchlistLoading}
                 >
-                  Watchlist
+                    {watchlistLoading ? 'Updating...' : isWatched ? 'On Watchlist' : 'Add to Watchlist'}
                 </Button>
                 <Button
                   variant="outlined"

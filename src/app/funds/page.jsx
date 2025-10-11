@@ -1,3 +1,4 @@
+// src/app/funds/page.jsx
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -35,17 +36,18 @@ import {
   ViewModule
 } from '@mui/icons-material';
 import Link from 'next/link';
-import { LoadingSpinner, PageLoadingSpinner, LoadingBar } from '@/components/LoadingComponents';
+import { LoadingBar } from '@/components/LoadingComponents';
 import { PerformanceIndicator, OptimizationBanner, LoadingOptimization } from '@/components/PerformanceComponents';
 import FundNavChartDialog from '@/components/FundNavChartDialog';
 
-// Client-side function to fetch schemes with pagination
-async function fetchSchemes(page = 1, limit = 50, search = '', category = 'all', fundHouse = 'all') {
+// Client-side function to fetch schemes with pagination (UPDATED to include status)
+async function fetchSchemes(page = 1, limit = 15, search = '', category = 'all', fundHouse = 'all', status = 'active') {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
   
   const params = new URLSearchParams({
     page: page.toString(),
     limit: limit.toString(),
+    status: status, // Pass status filter to API
   });
   
   if (search) params.append('search', search);
@@ -63,10 +65,12 @@ async function fetchSchemes(page = 1, limit = 50, search = '', category = 'all',
   return await res.json();
 }
 
-// Fetch all schemes (for filters only)
+// Fetch all schemes (for filters only) - UPDATED to request all statuses
 async function fetchAllSchemes() {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
-  const res = await fetch(`${baseUrl}/api/mf`, {
+  
+  // Request all funds (status=all) to build filter options from the complete list
+  const res = await fetch(`${baseUrl}/api/mf?limit=40000&status=all`, { 
     cache: 'no-store',
   });
   if (!res.ok) {
@@ -87,12 +91,13 @@ export default function FundsPage() {
   const [selectedFundHouse, setSelectedFundHouse] = useState('all');
   const [viewMode, setViewMode] = useState('grid');
   const [sortBy, setSortBy] = useState('name');
+  const [fundStatus, setFundStatus] = useState('active'); // Fund status state
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
-  const itemsPerPage = 50; // Items per page
+  const itemsPerPage = 15; 
 
   // Dialog state for NAV chart
   const [chartOpen, setChartOpen] = useState(false);
@@ -112,19 +117,19 @@ export default function FundsPage() {
     const loadInitialData = async () => {
       try {
         setLoading(true);
-        // Load all schemes for filter options (categories and fund houses)
+        // Load all schemes (active/inactive) for building filter options
         const allData = await fetchAllSchemes();
         setAllSchemes(allData);
         
-        // Load first page of data
-        const response = await fetchSchemes(1, itemsPerPage);
+        // Load first page of ACTIVE funds initially
+        const response = await fetchSchemes(1, itemsPerPage, '', 'all', 'all', fundStatus);
         if (response.data) {
           // Paginated response
           setSchemes(response.data);
           setTotalPages(response.pagination.totalPages);
           setTotalItems(response.pagination.total);
         } else {
-          // Non-paginated response (all data)
+          // Non-paginated response (fallback logic)
           setSchemes(response.slice(0, itemsPerPage));
           setTotalPages(Math.ceil(response.length / itemsPerPage));
           setTotalItems(response.length);
@@ -151,7 +156,8 @@ export default function FundsPage() {
           itemsPerPage, 
           debouncedSearchTerm, 
           selectedCategory, 
-          selectedFundHouse
+          selectedFundHouse,
+          fundStatus // Pass fundStatus
         );
         
         if (response.data) {
@@ -160,10 +166,9 @@ export default function FundsPage() {
           setTotalPages(response.pagination.totalPages);
           setTotalItems(response.pagination.total);
         } else {
-          // Non-paginated response - need to filter client-side
+          // Fallback filtering logic
           let filteredData = response;
           
-          // Apply client-side filtering if server-side didn't work
           if (debouncedSearchTerm) {
             const searchLower = debouncedSearchTerm.toLowerCase();
             filteredData = filteredData.filter(scheme => 
@@ -198,24 +203,25 @@ export default function FundsPage() {
       }
     };
 
-    // Don't reload on initial mount - only when filters change
     if (allSchemes.length > 0) {
       loadFilteredData();
     }
-  }, [currentPage, debouncedSearchTerm, selectedCategory, selectedFundHouse]);
+  }, [currentPage, debouncedSearchTerm, selectedCategory, selectedFundHouse, fundStatus]); 
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm, selectedCategory, selectedFundHouse, sortBy]);
+  }, [debouncedSearchTerm, selectedCategory, selectedFundHouse, sortBy, fundStatus]); 
 
-  // Get unique categories and fund houses from all schemes
+  // Get unique categories and fund houses from all schemes (Used for Autocomplete/Select)
   const categories = useMemo(() => {
+    // Only collect categories from the *complete* list (allSchemes)
     const cats = new Set(allSchemes.map(scheme => scheme.meta?.scheme_category).filter(Boolean));
     return Array.from(cats).sort();
   }, [allSchemes]);
 
   const fundHouses = useMemo(() => {
+    // Only collect fund houses from the *complete* list (allSchemes)
     const houses = new Set(allSchemes.map(scheme => scheme.meta?.fund_house).filter(Boolean));
     return Array.from(houses).sort();
   }, [allSchemes]);
@@ -238,23 +244,17 @@ export default function FundsPage() {
     return sorted;
   }, [schemes, sortBy]);
 
-  // Group schemes by fund house for accordion view
-  const groupedSchemes = useMemo(() => {
-    return sortedSchemes.reduce((acc, scheme) => {
-      const fundHouse = scheme.meta?.fund_house || 'Unknown';
-      if (!acc[fundHouse]) {
-        acc[fundHouse] = [];
-      }
-      acc[fundHouse].push(scheme);
-      return acc;
-    }, {});
-  }, [sortedSchemes]);
-
   const handleOpenChart = (scheme) => {
     setSelectedScheme(scheme);
     setChartOpen(true);
   };
   const handleCloseChart = () => setChartOpen(false);
+  
+  // Logic to determine if a fund is active (Replicated from API logic for UI styling)
+  const isFundActive = (fund) => {
+    return !!fund.isin_growth || !!fund.isin_div_reinvestment;
+  }
+
 
   if (loading && schemes.length === 0) {
     return (
@@ -282,6 +282,119 @@ export default function FundsPage() {
       </Container>
     );
   }
+
+  // Helper component for rendering fund card content based on view mode
+  const FundCardContent = ({ fund }) => {
+    // Determine if the fund is INACTIVE based on the combined logic
+    const isActiveFund = isFundActive(fund);
+    const showInactiveMarker = fundStatus !== 'active' && !isActiveFund;
+    
+    if (viewMode === 'list') {
+      return (
+        <Grid container spacing={2} alignItems="center">
+          {/* Fund Name and House */}
+          <Grid item xs={12} sm={6}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TrendingUp sx={{ color: showInactiveMarker ? 'error.main' : 'primary.main', fontSize: 18 }} />
+              <Box>
+                <Typography 
+                  variant="subtitle1" 
+                  component="h3" 
+                  sx={{ fontWeight: 600, textDecoration: showInactiveMarker ? 'line-through' : 'none' }}
+                >
+                  {fund.scheme_name || 'Inactive Scheme'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {fund.meta?.fund_house || 'Unknown Fund House'}
+                </Typography>
+              </Box>
+            </Box>
+          </Grid>
+          
+          {/* Categories and Info */}
+          <Grid item xs={12} sm={6}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'flex-end' }}>
+              <Chip
+                size="small"
+                label={fund.meta?.scheme_category || 'Unknown Category'}
+                color={showInactiveMarker ? 'default' : 'primary'}
+                variant={showInactiveMarker ? 'outlined' : 'filled'}
+              />
+              {showInactiveMarker && <Chip label="INACTIVE" color="error" size="small" />}
+              {fund.meta?.scheme_type && (
+                <Chip
+                  size="small"
+                  label={fund.meta.scheme_type}
+                  color="secondary"
+                  variant="outlined"
+                />
+              )}
+              <Chip
+                size="small"
+                label={`Code: ${fund.scheme_code}`}
+                variant="outlined"
+                color="default"
+              />
+            </Box>
+          </Grid>
+        </Grid>
+      );
+    }
+    
+    // Grid View
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
+          <TrendingUp sx={{ color: showInactiveMarker ? 'error.main' : 'primary.main', mt: 0.5 }} />
+          <Box sx={{ flex: 1 }}>
+            <Typography 
+              variant="h6" 
+              component="h3" 
+              sx={{ 
+                fontWeight: 600,
+                mb: 1,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                lineHeight: 1.3,
+                textDecoration: showInactiveMarker ? 'line-through' : 'none'
+              }}
+            >
+              {fund.scheme_name || 'Inactive Scheme'}
+            </Typography>
+            <Typography 
+              variant="body2" 
+              color="text.secondary"
+              sx={{ mb: 1 }}
+            >
+              {fund.meta?.fund_house || 'Unknown Fund House'}
+            </Typography>
+          </Box>
+        </Box>
+
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
+          <Chip
+            size="small"
+            label={fund.meta?.scheme_category || 'Unknown Category'}
+            color={showInactiveMarker ? 'default' : 'primary'}
+            variant="outlined"
+            sx={{ fontSize: '0.75rem' }}
+          />
+          {showInactiveMarker && <Chip label="INACTIVE" color="error" size="small" />}
+          {fund.meta?.scheme_type && (
+            <Chip
+              size="small"
+              label={fund.meta.scheme_type}
+              color="secondary"
+              variant="outlined"
+              sx={{ fontSize: '0.75rem' }}
+            />
+          )}
+        </Box>
+      </Box>
+    );
+  };
 
   return (
     <Box>
@@ -312,7 +425,7 @@ export default function FundsPage() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
           <Chip 
             icon={<TrendingUp />} 
-            label={`${totalItems.toLocaleString()} Total Funds`}
+            label={`${totalItems.toLocaleString()} Funds Displayed`}
             color="primary"
             variant="outlined"
           />
@@ -322,6 +435,14 @@ export default function FundsPage() {
             color="secondary"
             variant="outlined"
           />
+          {fundStatus !== 'active' && (
+            <Chip 
+              label={`Status: ${fundStatus === 'inactive' ? 'INACTIVE' : 'ALL'}`}
+              color={fundStatus === 'inactive' ? 'error' : 'warning'}
+              variant="filled"
+              size="small"
+            />
+          )}
         </Box>
       </Box>
 
@@ -345,7 +466,7 @@ export default function FundsPage() {
         <Paper sx={{ p: 3, mb: 4, background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(20px)' }}>
         <Grid container spacing={3}>
           {/* Search Bar */}
-          <Grid size={{ xs: 12, md: 6 }} key="search-bar">
+          <Grid item xs={12} md={3} key="search-bar"> {/* md={3} for balanced layout */}
             <TextField
               fullWidth
               label="Search funds or fund houses"
@@ -367,8 +488,24 @@ export default function FundsPage() {
             />
           </Grid>
 
+          {/* Fund Status Filter */}
+          <Grid item xs={12} md={3} key="status-filter"> {/* md={3} for balanced layout */}
+            <FormControl fullWidth>
+              <InputLabel>Fund Status</InputLabel>
+              <Select
+                value={fundStatus}
+                label="Fund Status"
+                onChange={(e) => setFundStatus(e.target.value)}
+              >
+                <MenuItem value="active">Active Funds</MenuItem>
+                <MenuItem value="inactive">Inactive/Delisted Funds</MenuItem>
+                <MenuItem value="all">All Funds (Active + Inactive)</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
           {/* Category Filter */}
-          <Grid size={{ xs: 12, md: 3 }} key="category-filter">
+          <Grid item xs={12} md={3} key="category-filter"> {/* md={3} for balanced layout */}
             <FormControl fullWidth>
               <InputLabel>Category</InputLabel>
               <Select
@@ -385,24 +522,32 @@ export default function FundsPage() {
               </Select>
             </FormControl>
           </Grid>
-
-          {/* Fund House Filter */}
-          <Grid size={{ xs: 12, md: 3 }} key="fundhouse-filter">
+          
+          {/* Fund House Filter (Fix applied here) */}
+          <Grid item xs={12} md={3} key="fundhouse-filter"> {/* md={3} for balanced layout */}
             <Autocomplete
+              autoHighlight
               value={selectedFundHouse === 'all' ? null : selectedFundHouse}
               onChange={(event, newValue) => {
                 setSelectedFundHouse(newValue || 'all');
               }}
               options={fundHouses}
               renderInput={(params) => (
-                <TextField {...params} label="Fund House" />
+                <TextField 
+                  {...params} 
+                  label="Fund House" 
+                  InputLabelProps={{ 
+                    ...params.InputLabelProps,
+                    shrink: true 
+                  }}
+                />
               )}
             />
           </Grid>
         </Grid>
 
         {/* Controls Row */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3, flexWrap: 'wrap', rowGap: 2 }}>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <FormControl size="small" sx={{ minWidth: 120 }}>
               <InputLabel>Sort by</InputLabel>
@@ -418,7 +563,7 @@ export default function FundsPage() {
             </FormControl>
             
             <Typography variant="body2" color="text.secondary">
-              {totalItems.toLocaleString()} funds found
+              {totalItems.toLocaleString()} funds matched
             </Typography>
           </Box>
 
@@ -443,12 +588,18 @@ export default function FundsPage() {
       {loading && (
         <Grid container spacing={3}>
           {Array.from({ length: 12 }).map((_, index) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={`loading-skeleton-${index}`}>
+            <Grid 
+              item 
+              xs={12} 
+              sm={viewMode === 'grid' ? 4 : 12} 
+              md={viewMode === 'grid' ? 4 : 12} 
+              key={`loading-skeleton-${index}`}
+            >
               <Card>
                 <CardContent>
-                  <Skeleton variant="text" width="80%" height={32} />
-                  <Skeleton variant="text" width="60%" height={24} />
-                  <Skeleton variant="text" width="40%" height={20} />
+                  <Skeleton variant="text" width="80%" height={viewMode === 'grid' ? 32 : 24} />
+                  <Skeleton variant="text" width="60%" height={viewMode === 'grid' ? 24 : 16} />
+                  {viewMode === 'grid' && <Skeleton variant="text" width="40%" height={20} />}
                   <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
                     <Skeleton variant="rectangular" width={80} height={24} />
                     <Skeleton variant="rectangular" width={60} height={24} />
@@ -476,11 +627,10 @@ export default function FundsPage() {
           <Grid container spacing={3}>
             {sortedSchemes.map((fund, index) => (
               <Grid 
-                size={{ 
-                  xs: 12, 
-                  sm: viewMode === 'grid' ? 6 : 12, 
-                  md: viewMode === 'grid' ? 4 : 12 
-                }}
+                item 
+                xs={12} 
+                sm={viewMode === 'grid' ? 4 : 12} 
+                md={viewMode === 'grid' ? 4 : 12} 
                 key={fund.scheme_code || `fund-${index}`}
               >
                 <Fade in={true} timeout={300 + index * 50}>
@@ -494,55 +644,11 @@ export default function FundsPage() {
                         boxShadow: '0 12px 40px rgba(102, 126, 234, 0.15)',
                       },
                     }}
-                    onClick={(e) => { e.preventDefault(); handleOpenChart(fund); }}
+                    // Open dialog on click
+                    onClick={() => handleOpenChart(fund)} 
                   >
                     <CardContent sx={{ p: 3 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
-                        <TrendingUp sx={{ color: 'primary.main', mt: 0.5 }} />
-                        <Box sx={{ flex: 1 }}>
-                          <Typography 
-                            variant="h6" 
-                            component="h3" 
-                            sx={{ 
-                              fontWeight: 600,
-                              mb: 1,
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                              lineHeight: 1.3,
-                            }}
-                          >
-                            {fund.scheme_name || 'Unknown Scheme'}
-                          </Typography>
-                          <Typography 
-                            variant="body2" 
-                            color="text.secondary"
-                            sx={{ mb: 1 }}
-                          >
-                            {fund.meta?.fund_house || 'Unknown Fund House'}
-                          </Typography>
-                        </Box>
-                      </Box>
-
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
-                        <Chip
-                          size="small"
-                          label={fund.meta?.scheme_category || 'Unknown Category'}
-                          color="primary"
-                          variant="outlined"
-                          sx={{ fontSize: '0.75rem' }}
-                        />
-                        {fund.meta?.scheme_type && (
-                          <Chip
-                            size="small"
-                            label={fund.meta.scheme_type}
-                            color="secondary"
-                            variant="outlined"
-                            sx={{ fontSize: '0.75rem' }}
-                          />
-                        )}
-                      </Box>
+                      <FundCardContent fund={fund} />
                     </CardContent>
                   </Card>
                 </Fade>
