@@ -1,35 +1,70 @@
 // src/app/api/watchlist/route.js
 import { NextResponse } from 'next/server';
 import { guardedApi } from '@/lib/apiGuard';
+import { getDb } from '@/lib/mongodb'; // MongoDB connection utility import kiya gaya
 
-// --- MOCKED DATABASE SIMULATION ---
-// IMPORTANT: Yeh data abhi memory mein store ho raha hai. Isko MongoDB se replace karna hoga.
-let MOCKED_WATCHLIST = [
-    { scheme_code: "100027", scheme_name: "Grindlays Super Saver Income Fund-GSSIF-Half Yearly Dividend" },
-    { scheme_code: "100030", scheme_name: "UTI-Mahindra Mutual Fund - UTI-Mahindra Mutual Fund" },
-];
-// ----------------------------------
+// Fixed User Identifier: Authentication na hone ke kaaran, hum default_user use kar rahe hain
+const USER_ID = 'default_user'; 
+const WATCHLIST_COLLECTION = 'watchlist';
 
-// MOCK DB FUNCTIONS
+
+// MONGODB DB FUNCTIONS (Actual Implementation)
+
+/**
+ * MongoDB se current user ka watchlist array fetch karta hai.
+ */
 async function getWatchlistFromDB() {
-    await new Promise(resolve => setTimeout(resolve, 50));
-    return MOCKED_WATCHLIST;
-}
-
-async function addToWatchlistDB(schemeCode, schemeName) {
-    if (!MOCKED_WATCHLIST.some(item => item.scheme_code === schemeCode)) {
-        MOCKED_WATCHLIST.push({ scheme_code: schemeCode, scheme_name: schemeName });
-        return true;
+    try {
+        const db = await getDb();
+        const doc = await db.collection(WATCHLIST_COLLECTION).findOne({ user_id: USER_ID });
+        // Document mein schemes array ko return karta hai
+        return doc?.schemes || []; 
+    } catch (e) {
+        console.error("MongoDB Watchlist GET Error:", e);
+        return [];
     }
-    return false;
 }
 
-async function removeFromWatchlistDB(schemeCode) {
-    const initialLength = MOCKED_WATCHLIST.length;
-    MOCKED_WATCHLIST = MOCKED_WATCHLIST.filter(item => item.scheme_code !== schemeCode);
-    return MOCKED_WATCHLIST.length < initialLength;
+/**
+ * Watchlist mein naya fund add karta hai (using $addToSet to avoid duplicates).
+ */
+async function addToWatchlistDB(schemeCode, schemeName) {
+    try {
+        const db = await getDb();
+        const result = await db.collection(WATCHLIST_COLLECTION).updateOne(
+            { user_id: USER_ID },
+            { 
+                $addToSet: { 
+                    schemes: { scheme_code: schemeCode, scheme_name: schemeName } 
+                } 
+            },
+            { upsert: true } // Agar user ka document exist nahi karta, toh naya bana dega
+        );
+        // Agar naya document bana ya koi item add hua, toh success
+        return result.modifiedCount > 0 || result.upsertedCount > 0;
+    } catch (e) {
+        console.error("MongoDB Watchlist POST Error:", e);
+        return false;
+    }
 }
-// ----------------------------------
+
+/**
+ * Watchlist se fund ko hatata hai (using $pull).
+ */
+async function removeFromWatchlistDB(schemeCode) {
+    try {
+        const db = await getDb();
+        const result = await db.collection(WATCHLIST_COLLECTION).updateOne(
+            { user_id: USER_ID },
+            { $pull: { schemes: { scheme_code: schemeCode } } } // Schemes array se item ko hatana
+        );
+        // Agar koi document modify hua hai (item remove hua), toh success
+        return result.modifiedCount > 0;
+    } catch (e) {
+        console.error("MongoDB Watchlist DELETE Error:", e);
+        return false;
+    }
+}
 
 
 // GET: Fetch the current watchlist

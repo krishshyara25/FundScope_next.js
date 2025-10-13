@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation'; // NEW IMPORT for navigation
 import { 
   Typography, 
   Container, 
@@ -38,16 +39,16 @@ import {
 import Link from 'next/link';
 import { LoadingBar } from '@/components/LoadingComponents';
 import { PerformanceIndicator, OptimizationBanner, LoadingOptimization } from '@/components/PerformanceComponents';
-import FundNavChartDialog from '@/components/FundNavChartDialog';
+// REMOVED: import FundNavChartDialog from '@/components/FundNavChartDialog';
 
-// Client-side function to fetch schemes with pagination (UPDATED to include status)
+// Client-side function to fetch schemes with pagination
 async function fetchSchemes(page = 1, limit = 15, search = '', category = 'all', fundHouse = 'all', status = 'active') {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
   
   const params = new URLSearchParams({
     page: page.toString(),
     limit: limit.toString(),
-    status: status, // Pass status filter to API
+    status: status, 
   });
   
   if (search) params.append('search', search);
@@ -65,11 +66,10 @@ async function fetchSchemes(page = 1, limit = 15, search = '', category = 'all',
   return await res.json();
 }
 
-// Fetch all schemes (for filters only) - UPDATED to request all statuses
+// Fetch all schemes (for filters only)
 async function fetchAllSchemes() {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
   
-  // Request all funds (status=all) to build filter options from the complete list
   const res = await fetch(`${baseUrl}/api/mf?limit=40000&status=all`, { 
     cache: 'no-store',
   });
@@ -81,8 +81,9 @@ async function fetchAllSchemes() {
 }
 
 export default function FundsPage() {
+  const router = useRouter(); // INITIALIZE ROUTER
   const [schemes, setSchemes] = useState([]);
-  const [allSchemes, setAllSchemes] = useState([]); // For filter options
+  const [allSchemes, setAllSchemes] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -91,7 +92,7 @@ export default function FundsPage() {
   const [selectedFundHouse, setSelectedFundHouse] = useState('all');
   const [viewMode, setViewMode] = useState('grid');
   const [sortBy, setSortBy] = useState('name');
-  const [fundStatus, setFundStatus] = useState('active'); // Fund status state
+  const [fundStatus, setFundStatus] = useState('active'); 
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -99,9 +100,7 @@ export default function FundsPage() {
   const [totalItems, setTotalItems] = useState(0);
   const itemsPerPage = 15; 
 
-  // Dialog state for NAV chart
-  const [chartOpen, setChartOpen] = useState(false);
-  const [selectedScheme, setSelectedScheme] = useState(null);
+  // REMOVED DIALOG STATE: chartOpen, selectedScheme
 
   // Debounce search term
   useEffect(() => {
@@ -117,19 +116,15 @@ export default function FundsPage() {
     const loadInitialData = async () => {
       try {
         setLoading(true);
-        // Load all schemes (active/inactive) for building filter options
         const allData = await fetchAllSchemes();
         setAllSchemes(allData);
         
-        // Load first page of ACTIVE funds initially
         const response = await fetchSchemes(1, itemsPerPage, '', 'all', 'all', fundStatus);
         if (response.data) {
-          // Paginated response
           setSchemes(response.data);
           setTotalPages(response.pagination.totalPages);
           setTotalItems(response.pagination.total);
         } else {
-          // Non-paginated response (fallback logic)
           setSchemes(response.slice(0, itemsPerPage));
           setTotalPages(Math.ceil(response.length / itemsPerPage));
           setTotalItems(response.length);
@@ -157,11 +152,10 @@ export default function FundsPage() {
           debouncedSearchTerm, 
           selectedCategory, 
           selectedFundHouse,
-          fundStatus // Pass fundStatus
+          fundStatus
         );
         
         if (response.data) {
-          // Paginated response
           setSchemes(response.data);
           setTotalPages(response.pagination.totalPages);
           setTotalItems(response.pagination.total);
@@ -189,7 +183,6 @@ export default function FundsPage() {
             );
           }
 
-          // Apply client-side pagination
           const startIndex = (currentPage - 1) * itemsPerPage;
           setSchemes(filteredData.slice(startIndex, startIndex + itemsPerPage));
           setTotalPages(Math.ceil(filteredData.length / itemsPerPage));
@@ -215,13 +208,11 @@ export default function FundsPage() {
 
   // Get unique categories and fund houses from all schemes (Used for Autocomplete/Select)
   const categories = useMemo(() => {
-    // Only collect categories from the *complete* list (allSchemes)
     const cats = new Set(allSchemes.map(scheme => scheme.meta?.scheme_category).filter(Boolean));
     return Array.from(cats).sort();
   }, [allSchemes]);
 
   const fundHouses = useMemo(() => {
-    // Only collect fund houses from the *complete* list (allSchemes)
     const houses = new Set(allSchemes.map(scheme => scheme.meta?.fund_house).filter(Boolean));
     return Array.from(houses).sort();
   }, [allSchemes]);
@@ -244,11 +235,7 @@ export default function FundsPage() {
     return sorted;
   }, [schemes, sortBy]);
 
-  const handleOpenChart = (scheme) => {
-    setSelectedScheme(scheme);
-    setChartOpen(true);
-  };
-  const handleCloseChart = () => setChartOpen(false);
+  // REMOVED: handleOpenChart and handleCloseChart
   
   // Logic to determine if a fund is active (Replicated from API logic for UI styling)
   const isFundActive = (fund) => {
@@ -285,7 +272,6 @@ export default function FundsPage() {
 
   // Helper component for rendering fund card content based on view mode
   const FundCardContent = ({ fund }) => {
-    // Determine if the fund is INACTIVE based on the combined logic
     const isActiveFund = isFundActive(fund);
     const showInactiveMarker = fundStatus !== 'active' && !isActiveFund;
     
@@ -463,10 +449,10 @@ export default function FundsPage() {
 
       {/* Search and Filters */}
       <Container maxWidth="xl" sx={{ px: { xs: 2, sm: 3 } }}>
-        <Paper sx={{ p: 3, mb: 4, background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(20px)' }}>
+         <Paper sx={{ p: 3, mb: 4, bgcolor: 'background.paper', backdropFilter: 'blur(20px)' }}> {/* FIX: bgcolor to background.paper */}
         <Grid container spacing={3}>
           {/* Search Bar */}
-          <Grid item xs={12} md={3} key="search-bar"> {/* md={3} for balanced layout */}
+          <Grid item xs={12} md={4} key="search-bar">
             <TextField
               fullWidth
               label="Search funds or fund houses"
@@ -489,7 +475,7 @@ export default function FundsPage() {
           </Grid>
 
           {/* Fund Status Filter */}
-          <Grid item xs={12} md={3} key="status-filter"> {/* md={3} for balanced layout */}
+          <Grid item xs={12} md={3} key="status-filter">
             <FormControl fullWidth>
               <InputLabel>Fund Status</InputLabel>
               <Select
@@ -505,7 +491,7 @@ export default function FundsPage() {
           </Grid>
 
           {/* Category Filter */}
-          <Grid item xs={12} md={3} key="category-filter"> {/* md={3} for balanced layout */}
+          <Grid item xs={12} md={3} key="category-filter"> 
             <FormControl fullWidth>
               <InputLabel>Category</InputLabel>
               <Select
@@ -523,8 +509,8 @@ export default function FundsPage() {
             </FormControl>
           </Grid>
           
-          {/* Fund House Filter (Fix applied here) */}
-          <Grid item xs={12} md={3} key="fundhouse-filter"> {/* md={3} for balanced layout */}
+          {/* Fund House Filter */}
+          <Grid item xs={12} md={2} key="fundhouse-filter"> 
             <Autocomplete
               autoHighlight
               value={selectedFundHouse === 'all' ? null : selectedFundHouse}
@@ -645,7 +631,7 @@ export default function FundsPage() {
                       },
                     }}
                     // Open dialog on click
-                    onClick={() => handleOpenChart(fund)} 
+                    onClick={() => router.push(`/scheme/${fund.scheme_code}`)} // NAVIGATION FIX
                   >
                     <CardContent sx={{ p: 3 }}>
                       <FundCardContent fund={fund} />
@@ -658,12 +644,7 @@ export default function FundsPage() {
         </Fade>
       )}
 
-      <FundNavChartDialog 
-        open={chartOpen} 
-        onClose={handleCloseChart} 
-        schemeCode={selectedScheme?.scheme_code} 
-        schemeName={selectedScheme?.scheme_name}
-      />
+      {/* REMOVED: FundNavChartDialog */}
 
       {/* Pagination */}
       {!loading && totalPages > 1 && (

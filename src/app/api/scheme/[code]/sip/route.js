@@ -1,3 +1,4 @@
+// src/app/api/scheme/[code]/sip/route.js
 import { NextResponse } from 'next/server';
 import { getOrSetCache } from '@/lib/cache';
 import { calculateSIPReturns } from '@/utils/calculator'; // Correctly import the function
@@ -26,16 +27,16 @@ export async function POST(request, { params }) {
     // Call the robust calculation logic
     const results = calculateSIPReturns({ navHistory, amount, from, to });
 
-    // Map internal calculator names to the required API contract names
+    // FIX: Passing the monetary profit value (absoluteProfit) and correcting annualized return name
     return NextResponse.json({
       totalInvested: results.totalInvested,
       currentValue: results.currentValue,
       totalUnits: results.totalUnits,
-      // Use the percentage value calculated by the XIRR logic
-      absoluteReturn: results.absoluteReturnPercent, 
-      annualizedReturn: results.annualizedReturnPercent, // XIRR-based (most accurate)
-      growthChartData: results.growthChartData, // Chart data included
-      duration: results.duration // Include duration for frontend display
+      absoluteProfit: results.absoluteProfit, // FIX: Monetary Profit value
+      absoluteReturnPercent: results.absoluteReturnPercent, // Percentage value
+      annualizedReturn: results.annualizedReturn, // XIRR-based (now correctly named)
+      growthChartData: results.growthChartData, 
+      duration: results.duration
     });
   } catch (error) {
     return NextResponse.json({ error: error.message || 'SIP calculation failed' }, { status: 500 });

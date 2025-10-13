@@ -1,6 +1,7 @@
+// src/components/SipCalculator.jsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -19,7 +20,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Divider
+  Divider,
+  ButtonGroup 
 } from '@mui/material';
 import { 
   Calculate,
@@ -31,15 +33,89 @@ import {
 } from '@mui/icons-material';
 import SipGrowthChart from './SipGrowthChart';
 
+// Define Quick Select Periods
+const QUICK_PERIODS = [
+    { label: '6M', months: 6 },
+    { label: '1Y', months: 12 },
+    { label: '3Y', months: 36 },
+    { label: '5Y', months: 60 },
+];
+
+// Helper function to calculate start date (remains the same)
+const getStartDate = (endDate, months) => {
+    const d = new Date(endDate);
+    if (isNaN(d.getTime())) return null;
+    
+    // Set the date back by the number of months
+    d.setMonth(d.getMonth() - months);
+    
+    // Format to YYYY-MM-DD string
+    return d.toISOString().split('T')[0];
+};
+
+// Helper to fetch scheme details for the latest NAV date (remains the same)
+async function fetchLatestNavDate(schemeCode) {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+    const response = await fetch(`${baseUrl}/api/scheme/${schemeCode}`); 
+    if (!response.ok) throw new Error('Failed to fetch scheme details for date initialization.');
+    const data = await response.json();
+    
+    const latestDate = data.data?.[0]?.date; 
+    if (!latestDate) throw new Error('No recent NAV date found.');
+
+    const parts = latestDate.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`; 
+    }
+    return new Date(latestDate).toISOString().split('T')[0];
+}
+
+
 export default function SipCalculator({ schemeCode }) {
-  const [amount, setAmount] = useState(20000);
-  const [from, setFrom] = useState('2020-01-01');
-  const [to, setTo] = useState('2023-12-31');
+  const [amount, setAmount] = useState(10000); 
+  const [from, setFrom] = useState(''); 
+  const [to, setTo] = useState(''); 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [quickPeriod, setQuickPeriod] = useState(null); 
 
   const presetAmounts = [1000, 2500, 5000, 10000, 25000, 50000];
+
+  // Effect to set the initial 'to' date (latest NAV date)
+  useEffect(() => {
+      let isMounted = true;
+      const setInitialDates = async () => {
+          if (!schemeCode) return;
+          try {
+              const latestDate = await fetchLatestNavDate(schemeCode);
+              if (isMounted) {
+                  setTo(latestDate);
+                  const defaultStartDate = getStartDate(latestDate, 12);
+                  setFrom(defaultStartDate);
+                  setQuickPeriod('1Y');
+              }
+          } catch (e) {
+              if (isMounted) {
+                  setError('Failed to initialize dates: ' + e.message);
+                  setTo(new Date().toISOString().split('T')[0]);
+              }
+          }
+      };
+      setInitialDates();
+      return () => { isMounted = false; };
+  }, [schemeCode]);
+  
+  // Handler for Quick Period Selection
+  const handleQuickPeriodSelect = (months, label) => {
+      setQuickPeriod(label);
+      if (to) {
+          const newStartDate = getStartDate(to, months);
+          setFrom(newStartDate);
+      }
+      if (from && to) handleCalculate(); 
+  };
+
 
   const handleCalculate = async () => {
     setLoading(true);
@@ -73,13 +149,17 @@ export default function SipCalculator({ schemeCode }) {
   };
 
   const formatPercentage = (value) => {
-    if (value === null) return 'N/A';
-    return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
+    if (value === null || value === undefined || Number.isNaN(value)) return 'N/A';
+    const num = Number(value);
+    if (!isFinite(num)) return 'N/A';
+    const sign = num > 0 ? '+' : (num < 0 ? '' : '');
+    return `${sign}${num.toFixed(2)}%`;
   };
 
   return (
     <Card 
       sx={{ 
+        height: '100%',
         background: 'linear-gradient(135deg, rgba(5, 150, 105, 0.05) 0%, rgba(255, 255, 255, 1) 100%)',
       }}
     >
@@ -101,13 +181,13 @@ export default function SipCalculator({ schemeCode }) {
               SIP Calculator
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Calculate systematic investment plan returns
+              Calculate systematic investment plan returns using real historical NAV
             </Typography>
           </Box>
         </Box>
 
         {/* Input Section */}
-        <Paper sx={{ p: 3, mb: 3, bgcolor: 'rgba(255, 255, 255, 0.7)' }}>
+        <Paper sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}> {/* FIX: bgcolor to theme color */}
           <Grid container spacing={3}>
             {/* Amount Section */}
             <Grid item xs={12}>
@@ -149,16 +229,39 @@ export default function SipCalculator({ schemeCode }) {
                 />
               </Box>
             </Grid>
+            
+            {/* Quick Period Selection */}
+            <Grid item xs={12}>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 500 }}>
+                    Quick Select Duration
+                </Typography>
+                <ButtonGroup fullWidth>
+                    {QUICK_PERIODS.map(period => (
+                        <Button
+                            key={period.label}
+                            onClick={() => handleQuickPeriodSelect(period.months, period.label)}
+                            variant={quickPeriod === period.label ? 'contained' : 'outlined'}
+                            color="secondary"
+                        >
+                            {period.label}
+                        </Button>
+                    ))}
+                </ButtonGroup>
+            </Grid>
+
 
             {/* Date Range */}
             <Grid item xs={12} sm={6}>
               <TextField
-                label="Start Date"
+                label="Start Date (From)"
                 type="date"
                 fullWidth
                 InputLabelProps={{ shrink: true }}
                 value={from}
-                onChange={(e) => setFrom(e.target.value)}
+                onChange={(e) => {
+                    setFrom(e.target.value);
+                    setQuickPeriod(null); // Clear quick period if user manually changes date
+                }}
                 InputProps={{
                   startAdornment: <DateRange color="action" />,
                 }}
@@ -166,7 +269,7 @@ export default function SipCalculator({ schemeCode }) {
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
-                label="End Date"
+                label="End Date (To - Latest NAV)"
                 type="date"
                 fullWidth
                 InputLabelProps={{ shrink: true }}
@@ -222,7 +325,7 @@ export default function SipCalculator({ schemeCode }) {
                   sx={{ 
                     p: 2, 
                     textAlign: 'center',
-                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(255, 255, 255, 1) 100%)',
+                    bgcolor: (theme) => theme.palette.mode === 'light' ? 'rgba(37, 99, 235, 0.1)' : theme.palette.grey[800],
                   }}
                 >
                   <AttachMoney sx={{ color: 'primary.main', mb: 1 }} />
@@ -240,7 +343,7 @@ export default function SipCalculator({ schemeCode }) {
                   sx={{ 
                     p: 2, 
                     textAlign: 'center',
-                    background: 'linear-gradient(135deg, rgba(5, 150, 105, 0.1) 0%, rgba(255, 255, 255, 1) 100%)',
+                    bgcolor: (theme) => theme.palette.mode === 'light' ? 'rgba(5, 150, 105, 0.1)' : theme.palette.grey[800],
                   }}
                 >
                   <TrendingUp sx={{ color: 'secondary.main', mb: 1 }} />
@@ -258,9 +361,9 @@ export default function SipCalculator({ schemeCode }) {
                   sx={{ 
                     p: 2, 
                     textAlign: 'center',
-                    background: result.absoluteProfit >= 0 
-                      ? 'linear-gradient(135deg, rgba(5, 150, 105, 0.1) 0%, rgba(255, 255, 255, 1) 100%)'
-                      : 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(255, 255, 255, 1) 100%)',
+                    bgcolor: (theme) => Number.isFinite(result.absoluteProfit) && result.absoluteProfit >= 0 
+                      ? theme.palette.mode === 'light' ? 'rgba(5, 150, 105, 0.1)' : theme.palette.grey[800]
+                      : theme.palette.mode === 'light' ? 'rgba(220, 38, 38, 0.1)' : theme.palette.grey[800],
                   }}
                 >
                   <Assessment sx={{ 
@@ -274,10 +377,10 @@ export default function SipCalculator({ schemeCode }) {
                     variant="h6" 
                     sx={{ 
                       fontWeight: 600,
-                      color: result.absoluteProfit >= 0 ? 'secondary.main' : 'error.main'
+                      color: Number.isFinite(result.absoluteProfit) && result.absoluteProfit >= 0 ? 'secondary.main' : 'error.main'
                     }}
                   >
-                    {formatCurrency(result.absoluteProfit)}
+                    {Number.isFinite(result.absoluteProfit) ? formatCurrency(result.absoluteProfit) : '—'}
                   </Typography>
                 </Paper>
               </Grid>
@@ -287,13 +390,13 @@ export default function SipCalculator({ schemeCode }) {
                   sx={{ 
                     p: 2, 
                     textAlign: 'center',
-                    background: result.annualizedReturnPercent >= 0 
-                      ? 'linear-gradient(135deg, rgba(5, 150, 105, 0.1) 0%, rgba(255, 255, 255, 1) 100%)'
-                      : 'linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(255, 255, 255, 1) 100%)',
+                    bgcolor: (theme) => Number.isFinite(result.annualizedReturn) && result.annualizedReturn >= 0
+                      ? theme.palette.mode === 'light' ? 'rgba(5, 150, 105, 0.1)' : theme.palette.grey[800]
+                      : theme.palette.mode === 'light' ? 'rgba(220, 38, 38, 0.1)' : theme.palette.grey[800],
                   }}
                 >
                   <ShowChart sx={{ 
-                    color: result.annualizedReturnPercent >= 0 ? 'secondary.main' : 'error.main', 
+                    color: result.annualizedReturn >= 0 ? 'secondary.main' : 'error.main', 
                     mb: 1 
                   }} />
                   <Typography variant="body2" color="text.secondary">
@@ -303,10 +406,10 @@ export default function SipCalculator({ schemeCode }) {
                     variant="h6" 
                     sx={{ 
                       fontWeight: 600,
-                      color: result.annualizedReturnPercent >= 0 ? 'secondary.main' : 'error.main'
+                      color: Number.isFinite(result.annualizedReturn) && result.annualizedReturn >= 0 ? 'secondary.main' : 'error.main'
                     }}
                   >
-                    {result.annualizedReturnPercent ? formatPercentage(result.annualizedReturnPercent) : 'N/A'}
+                    {Number.isFinite(result.annualizedReturn) ? formatPercentage(result.annualizedReturn) : 'N/A'}
                   </Typography>
                 </Paper>
               </Grid>
@@ -325,7 +428,7 @@ export default function SipCalculator({ schemeCode }) {
             )}
 
             {/* Summary */}
-            <Paper sx={{ p: 3, bgcolor: 'rgba(248, 250, 252, 0.8)' }}>
+            <Paper sx={{ p: 3, bgcolor: 'background.default' }}>
               <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
                 Investment Summary
               </Typography>

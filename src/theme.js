@@ -1,3 +1,4 @@
+// src/theme.js
 'use client';
 
 import { createTheme } from '@mui/material/styles';
@@ -9,42 +10,36 @@ const inter = Inter({
   display: 'swap',
 });
 
-const theme = createTheme({
+// Function to create a theme based on the selected mode
+const getAppTheme = (mode) => createTheme({
   palette: {
-    mode: 'light',
+    mode,
+    // Primary/Secondary colors remain consistent for branding
     primary: {
-      main: '#2563eb', // Modern blue
+      main: '#2563eb', 
       light: '#3b82f6',
       dark: '#1d4ed8',
     },
     secondary: {
-      main: '#059669', // Emerald green for positive returns
+      main: '#059669', 
       light: '#10b981',
       dark: '#047857',
     },
     error: {
-      main: '#dc2626', // Red for negative returns
+      main: '#dc2626', 
       light: '#ef4444',
       dark: '#b91c1c',
     },
-    warning: {
-      main: '#d97706', // Amber for neutral/caution
-      light: '#f59e0b',
-      dark: '#b45309',
-    },
-    info: {
-      main: '#0891b2', // Cyan for information
-      light: '#06b6d4',
-      dark: '#0e7490',
-    },
+    // Background and Text colors dynamically adjust based on mode
     background: {
-      default: '#f8fafc',
-      paper: '#ffffff',
+      default: mode === 'light' ? '#f8fafc' : '#111827', // Dark background
+      paper: mode === 'light' ? '#ffffff' : '#1f2937',   // Dark card/paper background
     },
     text: {
-      primary: '#0f172a',
-      secondary: '#64748b',
+      primary: mode === 'light' ? '#0f172a' : '#f8fafc',
+      secondary: mode === 'light' ? '#64748b' : '#9ca3af',
     },
+    // Grey shades setup
     grey: {
       50: '#f8fafc',
       100: '#f1f5f9',
@@ -60,50 +55,15 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: inter.style.fontFamily,
-    h1: {
-      fontSize: '2.5rem',
-      fontWeight: 800,
-      lineHeight: 1.2,
-      letterSpacing: '-0.02em',
-    },
-    h2: {
-      fontSize: '2rem',
-      fontWeight: 700,
-      lineHeight: 1.3,
-      letterSpacing: '-0.01em',
-    },
-    h3: {
-      fontSize: '1.75rem',
-      fontWeight: 600,
-      lineHeight: 1.3,
-    },
-    h4: {
-      fontSize: '1.5rem',
-      fontWeight: 600,
-      lineHeight: 1.4,
-    },
-    h5: {
-      fontSize: '1.25rem',
-      fontWeight: 600,
-      lineHeight: 1.4,
-    },
-    h6: {
-      fontSize: '1.125rem',
-      fontWeight: 600,
-      lineHeight: 1.4,
-    },
-    body1: {
-      fontSize: '1rem',
-      lineHeight: 1.6,
-    },
-    body2: {
-      fontSize: '0.875rem',
-      lineHeight: 1.5,
-    },
-    button: {
-      textTransform: 'none',
-      fontWeight: 500,
-    },
+    h1: { fontSize: '2.5rem', fontWeight: 800, lineHeight: 1.2, letterSpacing: '-0.02em' },
+    h2: { fontSize: '2rem', fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.01em' },
+    h3: { fontSize: '1.75rem', fontWeight: 600, lineHeight: 1.3 },
+    h4: { fontSize: '1.5rem', fontWeight: 600, lineHeight: 1.4 },
+    h5: { fontSize: '1.25rem', fontWeight: 600, lineHeight: 1.4 },
+    h6: { fontSize: '1.125rem', fontWeight: 600, lineHeight: 1.4 },
+    body1: { fontSize: '1rem', lineHeight: 1.6 },
+    body2: { fontSize: '0.875rem', lineHeight: 1.5 },
+    button: { textTransform: 'none', fontWeight: 500 },
   },
   shape: {
     borderRadius: 12,
@@ -139,8 +99,10 @@ const theme = createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
+          // FIX: Card background follows theme paper color
+          backgroundColor: mode === 'light' ? '#ffffff' : '#1f2937', 
+          border: `1px solid ${mode === 'light' ? '#e2e8f0' : '#475569'}`,
           boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-          border: '1px solid #e2e8f0',
           '&:hover': {
             boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
             transform: 'translateY(-2px)',
@@ -156,7 +118,7 @@ const theme = createTheme({
           borderRadius: 8,
           padding: '8px 16px',
           '&:hover': {
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+            boxShadow: '0 0 0 0.5px currentColor, 0 4px 6px -1px rgb(0 0 0 / 0.1)',
           },
         },
         contained: {
@@ -171,16 +133,23 @@ const theme = createTheme({
         root: {
           '& .MuiOutlinedInput-root': {
             borderRadius: 8,
-            backgroundColor: '#ffffff',
+            // FIX: Input field background dark mode ke hisaab se (was hardcoded white)
+            backgroundColor: mode === 'light' ? '#ffffff' : '#334155',
             '& fieldset': {
-              borderColor: '#e2e8f0',
+              borderColor: mode === 'light' ? '#e2e8f0' : '#475569',
             },
             '&:hover fieldset': {
-              borderColor: '#cbd5e1',
+              borderColor: mode === 'light' ? '#cbd5e1' : '#64748b',
             },
             '&.Mui-focused fieldset': {
               borderColor: '#2563eb',
             },
+          },
+          '& .MuiInputBase-input': {
+            color: mode === 'light' ? '#0f172a' : '#f1f5f9', // Input text color
+          },
+          '& .MuiInputLabel-root': {
+            color: mode === 'light' ? '#64748b' : '#94a3b8', // Label color
           },
         },
       },
@@ -193,7 +162,15 @@ const theme = createTheme({
         },
       },
     },
+    MuiPaper: {
+        styleOverrides: {
+            root: {
+                // Ensures plain Paper (like the filter bar or lookup box) also respects theme color
+                backgroundColor: 'inherit',
+            },
+        },
+    },
   },
 });
 
-export default theme;
+export default getAppTheme; // Export the function

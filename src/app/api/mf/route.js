@@ -11,8 +11,16 @@ const CACHE_TTL_SECONDS = 12 * 60 * 60; // 12 hours
 async function getMasterFundListFromDB() {
     try {
         const db = await getDb();
-        // Reads the single document storing the entire list of *active funds*
         const masterDoc = await db.collection("master_data").findOne({ _id: 'all_active_schemes' }); 
+        
+        // --- YE LINE ADD KAREIN (This is the proof) ---
+        if (masterDoc) {
+             console.log("✅ DATA SOURCE: MongoDB (Active Funds List Fetched)");
+        } else {
+             console.log("❌ DATA SOURCE: MongoDB (Document Not Found)");
+        }
+        // ------------------------------------------------
+
         return masterDoc ? masterDoc.data : [];
     } catch (error) {
         console.error("MongoDB read error in /api/mf:", error);

@@ -1,7 +1,7 @@
 // src/app/scheme/[code]/page.jsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Typography, 
   Grid, 
@@ -74,8 +74,11 @@ async function toggleWatchlist(code, name, isWatched) {
 }
 
 
-export default function SchemePage({ params }) {
-  const { code } = params;
+export default function SchemePage(props) {
+  // Avoid destructuring `params` in the signature (synchronous access).
+  // Unwrap the possibly Promise-like params using React.use(props.params).
+  const resolvedParams = React.use(props.params);
+  const { code } = resolvedParams || {};
   const [schemeData, setSchemeData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -196,7 +199,8 @@ export default function SchemePage({ params }) {
           sx={{ 
             p: 4, 
             mb: 4,
-            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(255, 255, 255, 1) 100%)',
+            // FIX: Use bgcolor (background.paper) directly instead of complex gradient
+            bgcolor: 'background.paper',
             border: '1px solid',
             borderColor: 'divider',
           }}
@@ -262,7 +266,7 @@ export default function SchemePage({ params }) {
                 <Button
                     variant={isWatched ? 'contained' : 'outlined'}
                     color={isWatched ? 'secondary' : 'primary'}
-                    startIcon={isWatched ? <Bookmark /> : <BookmarkBorder />}
+                    startIcon={isWatched ? <Bookmark /> : <BookmarkBorder />} // Icon based on state
                     size="small"
                     onClick={handleToggleWatchlist}
                     disabled={watchlistLoading}
@@ -284,12 +288,15 @@ export default function SchemePage({ params }) {
 
       <Fade in={true} timeout={800}>
         <Grid container spacing={4}>
-          <Grid item xs={12} lg={6}>
+          {/* LEFT COLUMN: Scheme Details Card */}
+          <Grid item xs={12} lg={5}>
             <SchemeDetails meta={meta} />
           </Grid>
           
-          <Grid item xs={12} lg={6}>
-            <Grid container spacing={4}>
+          {/* RIGHT COLUMN GROUP: Chart and Returns Table */}
+          <Grid item xs={12} lg={7}>
+            {/* Removed height: '100%' on inner grid for better flow and responsiveness */}
+            <Grid container spacing={4}> 
               <Grid item xs={12}>
                 <NavChart navHistory={navHistory} />
               </Grid>
@@ -299,6 +306,7 @@ export default function SchemePage({ params }) {
             </Grid>
           </Grid>
           
+          {/* SIP Calculator (Full Width Section) */}
           <Grid item xs={12}>
             <SipCalculator schemeCode={code} />
           </Grid>
