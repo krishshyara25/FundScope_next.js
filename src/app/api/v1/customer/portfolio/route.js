@@ -1,22 +1,19 @@
-// src/app/api/virtual-portfolio/route.js
+// src/app/api/v1/customer/portfolio/route.js
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb'; 
 import { guardedApi } from '@/lib/apiGuard';
-import { getMockUser, CURRENT_MOCK_USER_ID } from '@/lib/authMock'; // <-- NEW IMPORT
+import { getMockUser, CURRENT_MOCK_USER_ID } from '@/lib/authMock'; 
 
 const PORTFOLIO_COLLECTION = 'virtual_portfolio';
 const INITIAL_CREDIT = 500000; // Rs 5 Lakh initial credit
 
-// --- HELPER FUNCTION (Moved/Adapted from UI logic) ---
-// Fetches the latest NAV for a scheme to calculate current value.
+// --- HELPER FUNCTION ---
 async function simulateCurrentPerformance(schemeCode, units) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    // Use the existing scheme detail API for consistency
     const navRes = await fetch(`${baseUrl}/api/scheme/${schemeCode}`);
     if (!navRes.ok) throw new Error('Failed to fetch latest NAV');
     const navData = await navRes.json();
     
-    // Find the latest NAV (assuming data[0] is the latest)
     const latestNav = parseFloat(navData.data[0]?.nav);
     if (isNaN(latestNav) || latestNav <= 0) throw new Error('Invalid or zero latest NAV');
 
@@ -30,8 +27,8 @@ async function simulateCurrentPerformance(schemeCode, units) {
 export async function GET(request) {
     // --- RBAC CHECK (NEW) ---
     const user = getMockUser(CURRENT_MOCK_USER_ID);
-    if (!user || user.role !== 'customer_premium') {
-        // Return 403 Forbidden for unauthorized access
+    if (!user || (user.role !== 'customer_premium' && user.role !== 'seller' && user.role !== 'admin' && user.role !== 'company_head')) {
+        // Allowing access for premium customer and all higher roles
         return NextResponse.json({ error: 'Access denied. Virtual Portfolio requires Premium access.' }, { status: 403 });
     }
     const USER_ID = user.userId;
@@ -78,7 +75,7 @@ export async function GET(request) {
 export async function POST(request) {
     // --- RBAC CHECK (NEW) ---
     const user = getMockUser(CURRENT_MOCK_USER_ID);
-    if (!user || user.role !== 'customer_premium') {
+    if (!user || (user.role !== 'customer_premium' && user.role !== 'seller' && user.role !== 'admin' && user.role !== 'company_head')) {
         return NextResponse.json({ error: 'Access denied. Virtual Portfolio requires Premium access.' }, { status: 403 });
     }
     const USER_ID = user.userId;
@@ -166,7 +163,7 @@ export async function POST(request) {
 export async function DELETE(request) {
     // --- RBAC CHECK (NEW) ---
     const user = getMockUser(CURRENT_MOCK_USER_ID);
-    if (!user || user.role !== 'customer_premium') {
+    if (!user || (user.role !== 'customer_premium' && user.role !== 'seller' && user.role !== 'admin' && user.role !== 'company_head')) {
         return NextResponse.json({ error: 'Access denied. Virtual Portfolio requires Premium access.' }, { status: 403 });
     }
     const USER_ID = user.userId;

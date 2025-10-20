@@ -40,3 +40,25 @@ a {
     color-scheme: dark;
   }
 }
+
+/* Add this to the end of src/app/globals.css */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  /* Scrolls the first name instance + padding, creating a seamless loop */
+  100% { transform: translateX(calc(-50% - 16px)); } 
+}
+
+/* Base style for marquee to be applied via sx prop in MUI */
+.marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+  width: 100%;
+  height: 1.5em; /* Define height to contain text */
+}
+
+.marquee-text {
+  display: inline-block;
+  animation: marquee 10s linear infinite;
+  padding-right: 32px; /* Gap before the text repeats */
+  min-width: 100%; /* Important for initial display */
+}

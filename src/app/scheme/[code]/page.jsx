@@ -2,39 +2,55 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Typography, 
-  Grid, 
-  CircularProgress, 
-  Box, 
+import {
+  Typography,
+  Grid,
+  CircularProgress,
+  Box,
   Alert,
   Breadcrumbs,
   Link as MuiLink,
   Chip,
+  Container,
   Paper,
   Button,
-  ButtonGroup,
+  // ButtonGroup, // Not used
   Skeleton,
   Fade
 } from '@mui/material';
 import Link from 'next/link';
-import { 
-  Home, 
+import {
+  Home,
   NavigateNext,
   TrendingUp,
-  Assessment,
-  Calculate,
+  // Assessment, // Not used
+  // Calculate, // Not used
   Share,
   Bookmark,
   BookmarkBorder
 } from '@mui/icons-material';
+
+// --- Essential Component ---
 import SchemeDetails from '@/components/SchemeDetails';
-import NavChart from '@/components/NavChart';
-import SipCalculator from '@/components/SipCalculator';
-import PrecomputedReturnsTable from '@/components/PrecomputedReturnsTable';
+
+// 🚀 PERFORMANCE IMPROVEMENT: Dynamic Imports (Lazy Loading) for heavy components
+import dynamic from 'next/dynamic';
+
+const NavChart = dynamic(() => import('@/components/NavChart'), {
+    loading: () => <Skeleton variant="rectangular" height={320} sx={{ borderRadius: 2 }} />,
+});
+const PrecomputedReturnsTable = dynamic(() => import('@/components/PrecomputedReturnsTable'), {
+    loading: () => <Skeleton variant="rectangular" height={300} sx={{ borderRadius: 2 }} />,
+});
+const SipCalculator = dynamic(() => import('@/components/SipCalculator'), {
+    loading: () => <Skeleton variant="rectangular" height={450} sx={{ borderRadius: 2 }} />,
+});
+// -----------------------------
+
 
 async function fetchSchemeDetails(code) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+  // NOTE: Server-side cache should be optimized here for performance if data is static (e.g., revalidate: 3600)
   const res = await fetch(`${baseUrl}/api/scheme/${code}`, {
     cache: 'no-store',
   });
@@ -85,13 +101,17 @@ export default function SchemePage(props) {
   const [isWatched, setIsWatched] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
 
-  // Initial data load and watchlist status check
   useEffect(() => {
     const loadSchemeData = async () => {
       try {
         setLoading(true);
-        const data = await fetchSchemeDetails(code);
-        const watched = await checkWatchlist(code);
+        
+        // 🚀 OPTIMIZATION: Fetch details and watchlist status in parallel
+        const [data, watched] = await Promise.all([
+          fetchSchemeDetails(code),
+          checkWatchlist(code)
+        ]);
+        
         setSchemeData(data);
         setIsWatched(watched);
         setError(null);
@@ -169,9 +189,9 @@ export default function SchemePage(props) {
   })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) || [];
 
   const latestNav = navHistory.length > 0 ? navHistory[navHistory.length - 1] : null;
-
+  
   return (
-    <Box>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
       <Breadcrumbs 
         separator={<NavigateNext fontSize="small" />} 
         sx={{ mb: 3 }}
@@ -199,10 +219,10 @@ export default function SchemePage(props) {
           sx={{ 
             p: 4, 
             mb: 4,
-            // FIX: Use bgcolor (background.paper) directly instead of complex gradient
             bgcolor: 'background.paper',
             border: '1px solid',
             borderColor: 'divider',
+            borderRadius: 2,
           }}
         >
           <Grid container spacing={3} alignItems="center">
@@ -287,31 +307,38 @@ export default function SchemePage(props) {
       </Fade>
 
       <Fade in={true} timeout={800}>
-        <Grid container spacing={4}>
-          {/* LEFT COLUMN: Scheme Details Card */}
-          <Grid item xs={12} lg={5}>
-            <SchemeDetails meta={meta} />
-          </Grid>
+        <Grid container spacing={4} alignItems="stretch">
           
-          {/* RIGHT COLUMN GROUP: Chart and Returns Table */}
-          <Grid item xs={12} lg={7}>
-            {/* Removed height: '100%' on inner grid for better flow and responsiveness */}
-            <Grid container spacing={4}> 
-              <Grid item xs={12}>
-                <NavChart navHistory={navHistory} />
-              </Grid>
-              <Grid item xs={12}>
-                <PrecomputedReturnsTable schemeCode={code} />
-              </Grid>
-            </Grid>
-          </Grid>
-          
-          {/* SIP Calculator (Full Width Section) */}
+          {/* 1. NAV Performance & Chart (Full Width) - NOW LAZY LOADED */}
           <Grid item xs={12}>
-            <SipCalculator schemeCode={code} />
+            <Paper sx={{ p: 3, minHeight: 320 }}>
+              <NavChart navHistory={navHistory} />
+            </Paper>
           </Grid>
+          
+          {/* 2. Fund Details (Half Width) */}
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 3, height: '100%', bgcolor: 'background.paper' }}>
+              <SchemeDetails meta={meta} />
+            </Paper>
+          </Grid>
+          
+          {/* 3. Period Returns (Half Width) - NOW LAZY LOADED */}
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 3, height: '100%', bgcolor: 'background.paper' }}>
+              <PrecomputedReturnsTable schemeCode={code} />
+            </Paper>
+          </Grid>
+          
+          {/* 4. SIP Calculator (Full Width) - NOW LAZY LOADED */}
+          <Grid item xs={12}>
+            <Paper sx={{ p: 3 }}>
+              <SipCalculator schemeCode={code} />
+            </Paper>
+          </Grid>
+
         </Grid>
       </Fade>
-    </Box>
+    </Container>
   );
 }

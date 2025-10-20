@@ -1,14 +1,8 @@
 // src/theme.js
-'use client';
+ 'use client';
 
 import { createTheme } from '@mui/material/styles';
-import { Inter } from 'next/font/google';
 
-const inter = Inter({
-  weight: ['300', '400', '500', '600', '700', '800'],
-  subsets: ['latin'],
-  display: 'swap',
-});
 
 // Function to create a theme based on the selected mode
 const getAppTheme = (mode) => createTheme({
@@ -54,7 +48,9 @@ const getAppTheme = (mode) => createTheme({
     },
   },
   typography: {
-    fontFamily: inter.style.fontFamily,
+    // Avoid using next/font/google to maintain Turbopack compatibility.
+    // Use Inter if available (via <link> in layout) with robust fallbacks.
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'",
     h1: { fontSize: '2.5rem', fontWeight: 800, lineHeight: 1.2, letterSpacing: '-0.02em' },
     h2: { fontSize: '2rem', fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.01em' },
     h3: { fontSize: '1.75rem', fontWeight: 600, lineHeight: 1.3 },

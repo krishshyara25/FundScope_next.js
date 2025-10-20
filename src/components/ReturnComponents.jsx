@@ -73,7 +73,7 @@ export function ReturnText({ value, variant = 'body1', showIcon = true, prefix =
   );
 }
 
-export function CurrencyText({ value, variant = 'body1', currency = 'INR' }) {
+export function CurrencyText({ value, variant = 'body1', currency = 'INR', component = 'span', sx = {} }) {
   const formatCurrency = (val) => {
     if (val === null || val === undefined) return 'N/A';
     return new Intl.NumberFormat('en-IN', {
@@ -84,7 +84,7 @@ export function CurrencyText({ value, variant = 'body1', currency = 'INR' }) {
   };
 
   return (
-    <Typography variant={variant} sx={{ fontWeight: 500 }}>
+    <Typography variant={variant} component={component} sx={{ fontWeight: 500, ...sx }}>
       {formatCurrency(value)}
     </Typography>
   );
