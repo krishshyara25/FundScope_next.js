@@ -1,39 +1,41 @@
 // src/theme.js
- 'use client';
+'use client';
 
 import { createTheme } from '@mui/material/styles';
+import { Inter } from 'next/font/google';
 
+const inter = Inter({
+  weight: ['300', '400', '500', '600', '700', '800'],
+  subsets: ['latin'],
+  display: 'swap',
+});
 
 // Function to create a theme based on the selected mode
 const getAppTheme = (mode) => createTheme({
   palette: {
     mode,
-    // Primary/Secondary colors remain consistent for branding
+    // Primary/Secondary colors now use the provided palette
     primary: {
-      main: '#2563eb', 
-      light: '#3b82f6',
-      dark: '#1d4ed8',
+      main: '#016B61', // Dark Teal
+      light: '#019488', 
+      dark: '#004A41',
     },
     secondary: {
-      main: '#059669', 
-      light: '#10b981',
-      dark: '#047857',
+      main: '#70B2B2', // Muted Cyan/Teal (for gains/accents)
+      light: '#9ECFD4', // Light Cyan from palette
+      dark: '#4F7E7E',
     },
     error: {
-      main: '#dc2626', 
+      main: '#dc2626', // Keep standard error red
       light: '#ef4444',
       dark: '#b91c1c',
     },
     // Background and Text colors dynamically adjust based on mode
     background: {
-      default: mode === 'light' ? '#f8fafc' : '#111827', // Dark background
-      paper: mode === 'light' ? '#ffffff' : '#1f2937',   // Dark card/paper background
+      default: mode === 'light' ? '#E5E9C5' : '#111827', // <-- Main background is E5E9C5
+      paper: mode === 'light' ? '#ffffff' : '#1f2937',   
     },
-    text: {
-      primary: mode === 'light' ? '#0f172a' : '#f8fafc',
-      secondary: mode === 'light' ? '#64748b' : '#9ca3af',
-    },
-    // Grey shades setup
+    // Grey shades are kept to support text and dividers
     grey: {
       50: '#f8fafc',
       100: '#f1f5f9',
@@ -48,9 +50,7 @@ const getAppTheme = (mode) => createTheme({
     },
   },
   typography: {
-    // Avoid using next/font/google to maintain Turbopack compatibility.
-    // Use Inter if available (via <link> in layout) with robust fallbacks.
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'",
+    fontFamily: inter.style.fontFamily,
     h1: { fontSize: '2.5rem', fontWeight: 800, lineHeight: 1.2, letterSpacing: '-0.02em' },
     h2: { fontSize: '2rem', fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.01em' },
     h3: { fontSize: '1.75rem', fontWeight: 600, lineHeight: 1.3 },
@@ -138,7 +138,7 @@ const getAppTheme = (mode) => createTheme({
               borderColor: mode === 'light' ? '#cbd5e1' : '#64748b',
             },
             '&.Mui-focused fieldset': {
-              borderColor: '#2563eb',
+              borderColor: '#016B61', // Use new primary color
             },
           },
           '& .MuiInputBase-input': {
